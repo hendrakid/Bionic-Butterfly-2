@@ -41,6 +41,8 @@ Wi-Fi channel: 6
 Pairing: Static MAC
 Transmission: Unicast
 Application ACK: Required
+Periodic control transmission interval: 100 ms (10 Hz)
+Receiver link timeout: 500 ms since the last accepted valid control packet, subject to hardware validation
 
 Future transport:
 - nRF24L01

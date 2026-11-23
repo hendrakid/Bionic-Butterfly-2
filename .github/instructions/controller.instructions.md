@@ -52,6 +52,7 @@ It must not contain Bionic Butterfly-specific servo behavior.
 
 ## Timing
 
-- Target control update: 50 Hz.
+- Periodic control transmission interval: 100 ms (10 Hz).
+- Explicit DISARM requests must be sent immediately without waiting for the periodic interval.
 - Do not use blocking delay() in control loops.
 - Separate sampling, packet transmission, ACK handling, and UI updates.

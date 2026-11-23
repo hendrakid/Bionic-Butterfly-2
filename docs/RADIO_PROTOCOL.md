@@ -52,10 +52,14 @@ Receiver must verify:
 
 ## Reliability
 
+- Periodic control packets are transmitted every 100 ms (10 Hz).
+- Explicit DISARM requests are sent immediately without waiting for the periodic interval.
 - Application-level ACK required.
 - ACK references received sequence.
-- Timeout triggers connection degradation.
-- Duplicate packets must not update outputs.
+- Receiver link timeout is 500 ms since the last accepted valid control packet, subject to hardware validation; reaching this timeout triggers failsafe.
+- The receiver timeout is measured by elapsed time, not by counting missed packets; 500 ms corresponds to five transmission intervals.
+- Invalid, duplicate, or stale packets must not reset the receiver timeout or update outputs.
+- Controller ACK timeout is separate from the receiver link timeout and is not specified here.
 
 ## Future Compatibility
 

@@ -28,7 +28,12 @@ DISARMED
 
 ## Initial Timeout
 
-300 ms, subject to hardware validation.
+500 ms since the last accepted valid control packet, subject to hardware validation.
+
+- Measure elapsed time, not the number of missed packets.
+- At the 100 ms transmission interval, 500 ms corresponds to five transmission intervals.
+- Invalid, duplicate, or stale packets must not reset the timeout.
+- When elapsed time reaches 500 ms without a new valid control packet, enter failsafe.
 
 ## Servo Safety
 
