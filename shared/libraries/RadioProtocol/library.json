@@ -1,0 +1,8 @@
+
+{
+  "name": "RadioProtocol",
+  "version": "1.0.0",
+  "description": "Shared RC communication protocol",
+  "frameworks": ["arduino"],
+  "platforms": ["espressif32"]
+}

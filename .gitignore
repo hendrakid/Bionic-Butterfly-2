@@ -1,0 +1,23 @@
+
+.pio/
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
+
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+
+*.log
+
+# Local hardware configuration
+local_config.h
+secrets.h
+
+# Build artifacts
+build/
+dist/
