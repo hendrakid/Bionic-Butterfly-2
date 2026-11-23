@@ -1,22 +1,19 @@
 ---
-name: Implement Feature
-description: Implement an approved firmware feature following project architecture and engineering rules.
+name: implement-feature
+description: "Implement user-requested ESP32 Arduino firmware features in this repository while preserving its architecture, shared protocol, and receiver safety requirements."
 ---
-
 # Implement Feature
 
 Act as a senior embedded firmware developer.
 
-Implement the following approved feature:
-
-${input:feature:Describe the approved feature}
+Implement the feature described in the current user request and conversation. Treat the request as authorization for that scope; ask for clarification only when an essential behavior, hardware, protocol, or safety decision is unresolved.
 
 ## Mandatory Preparation
 
 1. Read repository instructions.
 2. Read relevant project documentation.
 3. Inspect existing implementation.
-4. Review the approved implementation plan.
+4. Use any agreed implementation plan. If none exists and the change is complex, state the approach, affected files, and safety/compatibility implications before editing.
 5. Identify the exact files that need modification.
 
 ## Implementation Rules

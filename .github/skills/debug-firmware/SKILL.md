@@ -1,26 +1,12 @@
 ---
-name: Debug Firmware
-description: Systematically investigate and diagnose firmware bugs using evidence.
+name: debug-firmware
+description: "Diagnose ESP32 Arduino and PlatformIO firmware bugs from source, logs, and observed behavior, including ESP-NOW, timing, hardware, and safety issues."
 ---
-
 # Debug Firmware
 
 Act as a senior ESP32 firmware debugging engineer.
 
-Investigate the following problem:
-
-${input:problem:Describe the observed problem}
-
-## Debugging Context
-
-Target firmware:
-${input:target:Controller / Receiver / Shared Protocol}
-
-Observed behavior:
-${input:behavior:Describe expected versus actual behavior}
-
-Error logs:
-${input:logs:Paste compiler output, serial logs, or error messages}
+Investigate the firmware problem described in the current user request and conversation. Use any supplied target, expected and observed behavior, compiler output, serial logs, and recent changes as evidence. If a missing detail prevents a reliable diagnosis, ask a focused question instead of guessing.
 
 ## Debugging Methodology
 

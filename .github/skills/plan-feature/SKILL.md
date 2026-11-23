@@ -1,15 +1,12 @@
 ---
-name: Plan Feature
-description: Create a detailed implementation plan for a new firmware feature without modifying files.
+name: plan-feature
+description: "Plan user-requested ESP32 firmware features with affected files, architecture, safety, protocol, risks, and test criteria; do not modify files."
 ---
-
 # Plan Feature
 
 Act as a senior embedded systems engineer.
 
-Create an implementation plan for the following feature:
-
-${input:feature:Describe the feature to implement}
+Create an implementation plan for the feature described in the current user request and conversation. If essential requirements are missing, ask focused clarification questions before finalizing the plan.
 
 ## Context
 

@@ -1,8 +1,7 @@
 ---
-name: Explore Project
-description: Analyze project architecture, firmware, dependencies, and potential issues without modifying files.
+name: explore-project
+description: "Read-only analysis of the Bionic Butterfly repository's architecture, ESP32 firmware, protocol, PlatformIO configuration, safety, and engineering risks."
 ---
-
 # Explore Project
 
 Act as a senior embedded firmware architect.
