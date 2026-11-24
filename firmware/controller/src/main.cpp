@@ -1,30 +1,26 @@
-#include <Arduino.h>
+﻿#include <Arduino.h>
 #include <RadioProtocol.h>
+#include <EspNowTransport.h>
+
+#include "ControllerLink.h"
+
+namespace {
+RadioTransport::EspNowTransport transport;
+ControllerLink controllerLink(transport);
+}
 
 void setup() {
     Serial.begin(115200);
-
+    delay(50);
     Serial.println();
     Serial.println("Bionic Butterfly Controller");
-    Serial.println("Firmware v1.0");
-
-    Serial.printf(
-        "Protocol version: %u\n",
-        RadioProtocol::PROTOCOL_VERSION
-    );
-
-    Serial.printf(
-        "Channels: %u\n",
-        RadioProtocol::CHANNEL_COUNT
-    );
-
-    Serial.printf(
-        "ESP-NOW channel: %u\n",
-        RadioProtocol::WIFI_CHANNEL
-    );
+    Serial.printf("Protocol version: %u channels: %u ESP-NOW channel: %u\n",
+                  RadioProtocol::PROTOCOL_VERSION,
+                  RadioProtocol::CHANNEL_COUNT,
+                  RadioProtocol::WIFI_CHANNEL);
+    controllerLink.begin(millis());
 }
 
 void loop() {
-    // Controller initialization will be implemented
-    // incrementally.
+    controllerLink.update(millis());
 }

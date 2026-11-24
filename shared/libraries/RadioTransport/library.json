@@ -1,0 +1,7 @@
+{
+  "name": "RadioTransport",
+  "version": "1.0.0",
+  "description": "Minimal shared transport interfaces and ESP-NOW adapter",
+  "frameworks": ["arduino"],
+  "platforms": ["espressif32"]
+}

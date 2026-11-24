@@ -1,32 +1,26 @@
-#include <Arduino.h>
+﻿#include <Arduino.h>
 #include <RadioProtocol.h>
+#include <EspNowTransport.h>
+
+#include "ReceiverLink.h"
+
+namespace {
+RadioTransport::EspNowTransport transport;
+ReceiverLink receiverLink(transport);
+}
 
 void setup() {
     Serial.begin(115200);
-
+    delay(50);
     Serial.println();
     Serial.println("Bionic Butterfly Receiver");
-    Serial.println("Firmware v1.0");
-
-    Serial.printf(
-        "Protocol version: %u\n",
-        RadioProtocol::PROTOCOL_VERSION
-    );
-
-    Serial.printf(
-        "Channels: %u\n",
-        RadioProtocol::CHANNEL_COUNT
-    );
-
-    Serial.printf(
-        "ESP-NOW channel: %u\n",
-        RadioProtocol::WIFI_CHANNEL
-    );
-
-    Serial.println("Initial state: DISARMED");
+    Serial.printf("Protocol version: %u channels: %u ESP-NOW channel: %u\n",
+                  RadioProtocol::PROTOCOL_VERSION,
+                  RadioProtocol::CHANNEL_COUNT,
+                  RadioProtocol::WIFI_CHANNEL);
+    receiverLink.begin(millis());
 }
 
 void loop() {
-    // Receiver initialization will be implemented
-    // incrementally.
+    receiverLink.update(millis());
 }
