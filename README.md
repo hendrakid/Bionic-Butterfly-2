@@ -38,17 +38,35 @@ pio run
 
 ## Upload Controller
 
+Port serial controller: `COM4`.
+
+```shell
 cd firmware/controller
-pio run -t upload
+pio run -t upload --upload-port COM4
+```
 
 ## Upload Receiver
 
+Port serial receiver: `COM10`.
+
+```shell
 cd firmware/receiver
-pio run -t upload
+pio run -t upload --upload-port COM10
+```
 
 ## Serial Monitor
 
-pio device monitor -b 115200
+Pilih port sesuai board yang ingin dipantau:
+
+```shell
+# Controller
+cd firmware/controller
+pio device monitor -p COM4 -b 115200
+
+# Receiver
+cd firmware/receiver
+pio device monitor -p COM10 -b 115200
+```
 
 ## Development Rules
 
