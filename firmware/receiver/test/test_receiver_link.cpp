@@ -110,10 +110,11 @@ void testDuplicateStaleTimeoutAndRecovery() {
     assert(link.metrics().timedOut);
     assert(link.metrics().timeoutTransitions == 1);
 
-    transport.enqueue(makeControl(101, 620));
+    transport.enqueue(makeControl(0, 620));
     link.update(620);
     assert(!link.metrics().timedOut);
     assert(link.metrics().acceptedControls == 2);
+    assert(link.metrics().lastSequence == 0);
     assert(link.metrics().lastRecoveryMs == 20);
 }
 

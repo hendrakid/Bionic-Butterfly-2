@@ -110,6 +110,7 @@ void ReceiverLink::updateTimeout(uint32_t nowMs) {
     if (!metrics_.timedOut &&
         static_cast<uint32_t>(nowMs - lastAcceptedAtMs_) >= ReceiverConfig::LINK_TIMEOUT_MS) {
         metrics_.timedOut = true;
+        hasLastSequence_ = false;
         ++metrics_.timeoutTransitions;
         lastTimeoutAtMs_ = nowMs;
         Serial.printf("RX link=TIMEOUT safe_state=DISARMED servo=disabled age_ms=%lu\n",
