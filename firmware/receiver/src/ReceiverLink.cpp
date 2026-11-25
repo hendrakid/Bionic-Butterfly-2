@@ -34,7 +34,8 @@ void ReceiverLink::update(uint32_t nowMs) {
     if (!ready_) {
         return;
     }
-    processControls(nowMs);
+    processControls();
+    nowMs = millis();
     updateTimeout(nowMs);
     if (static_cast<uint32_t>(nowMs - lastLogMs_) >= 1000) {
         logStats(nowMs);
@@ -46,10 +47,11 @@ bool ReceiverLink::isExpectedMac(const uint8_t* mac) const {
     return macEquals(mac, ReceiverConfig::CONTROLLER_MAC);
 }
 
-void ReceiverLink::processControls(uint32_t nowMs) {
+void ReceiverLink::processControls() {
     RadioTransport::RxFrame frame{};
     uint8_t processed = 0;
     while (processed++ < RadioTransport::RX_DRAIN_BUDGET && transport_.tryReceive(frame)) {
+        const uint32_t nowMs = millis();
         if (!isExpectedMac(frame.sourceMac) ||
             frame.length != RadioProtocol::CONTROL_PACKET_WIRE_SIZE) {
             ++metrics_.rejectedControls;
@@ -58,6 +60,9 @@ void ReceiverLink::processControls(uint32_t nowMs) {
         if (static_cast<uint32_t>(nowMs - frame.receivedAtMs) >=
             ReceiverConfig::LINK_TIMEOUT_MS) {
             ++metrics_.expiredFrames;
+            if (static_cast<int32_t>(nowMs - frame.receivedAtMs) < 0) {
+                ++metrics_.futureFrames;
+            }
             continue;
         }
 
@@ -102,7 +107,6 @@ void ReceiverLink::processControls(uint32_t nowMs) {
             ++metrics_.acknowledgmentSendFailures;
         }
 
-        (void)nowMs;
     }
 }
 
@@ -121,7 +125,8 @@ void ReceiverLink::updateTimeout(uint32_t nowMs) {
 void ReceiverLink::logStats(uint32_t nowMs) {
     const RadioTransport::TransportStats stats = transport_.stats();
     Serial.printf("RX t=%lu controls=%lu rejected=%lu expired=%lu acks=%lu ack_fail=%lu timed_out=%u "
-                  "radio_ok=%lu radio_fail=%lu rx_overflow=%lu rx_high=%lu timeouts=%lu\n",
+                  "radio_ok=%lu radio_fail=%lu rx_overflow=%lu rx_high=%lu timeouts=%lu "
+                  "rx_frames=%lu rx_invalid=%lu rx_oversized=%lu future=%lu\n",
                   static_cast<unsigned long>(nowMs),
                   static_cast<unsigned long>(metrics_.acceptedControls),
                   static_cast<unsigned long>(metrics_.rejectedControls),
@@ -133,5 +138,9 @@ void ReceiverLink::logStats(uint32_t nowMs) {
                   static_cast<unsigned long>(stats.radioSendFailure),
                   static_cast<unsigned long>(stats.queueOverflows),
                   static_cast<unsigned long>(stats.queueHighWater),
-                  static_cast<unsigned long>(metrics_.timeoutTransitions));
+                  static_cast<unsigned long>(metrics_.timeoutTransitions),
+                  static_cast<unsigned long>(stats.receivedFrames),
+                  static_cast<unsigned long>(stats.invalidFrames),
+                  static_cast<unsigned long>(stats.oversizedFrames),
+                  static_cast<unsigned long>(metrics_.futureFrames));
 }

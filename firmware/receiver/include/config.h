@@ -1,6 +1,6 @@
 #pragma once
 
-#include <RadioTransport.h>
+#include <IRadioTransport.h>
 #include <RadioProtocol.h>
 
 namespace ReceiverConfig {

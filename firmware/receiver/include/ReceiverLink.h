@@ -11,6 +11,7 @@ public:
         uint32_t acknowledgmentsSent;
         uint32_t acknowledgmentSendFailures;
         uint32_t expiredFrames;
+        uint32_t futureFrames;
         uint32_t timeoutTransitions;
         uint32_t armRequestsIgnored;
         uint32_t lastRecoveryMs;
@@ -25,7 +26,7 @@ public:
 
 private:
     bool isExpectedMac(const uint8_t* mac) const;
-    void processControls(uint32_t nowMs);
+    void processControls();
     void updateTimeout(uint32_t nowMs);
     void logStats(uint32_t nowMs);
 

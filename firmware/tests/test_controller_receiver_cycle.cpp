@@ -87,6 +87,7 @@ void testControlIsReceivedAckedAndConfirmed() {
     assert(bus.receiverInbox.size() == 1);
 
     bus.nowMs = 1;
+    testMillis = bus.nowMs;
     receiver.update(bus.nowMs);
     assert(receiver.metrics().acceptedControls == 1);
     assert(receiver.metrics().acknowledgmentsSent == 1);
