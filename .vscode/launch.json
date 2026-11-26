@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Link Monitor",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": ".\\tools\\link_monitor\\dist\\LinkMonitor\\LinkMonitor.exe",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

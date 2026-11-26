@@ -71,6 +71,10 @@ Receiver must verify:
 - Baseline procedure: run both boards at 1 m with fixed antennas/orientation for a documented duration, record board/build IDs and actual STA MACs, then compare counters and RTT. Repeat controlled disconnect/reconnect cycles to measure recovery. No performance threshold is set until baseline data exists.
 - Receiver remains DISARMED and servo outputs are disabled throughout this initial-link test.
 
+### Desktop Link Monitor
+
+The independent [Link Monitor](../tools/link_monitor/README.md) reads both existing serial logs without firmware or radio changes. It visualizes aggregate counter deltas, estimated ACK coverage, expired frames, and capture quality; it cannot reconstruct every packet or exact no-ACK timeouts. See [LINK_MONITOR.md](LINK_MONITOR.md) for metric semantics and required USB/radio hardware validation.
+
 ## Future Compatibility
 
 Any incompatible packet layout requires a protocol version change.

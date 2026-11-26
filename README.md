@@ -17,6 +17,7 @@ Wireless RC-controlled Bionic Butterfly project.
 firmware/controller
 firmware/receiver
 shared/libraries/RadioProtocol
+tools/link_monitor
 docs
 
 ## Requirements
@@ -67,6 +68,10 @@ pio device monitor -p COM4 -b 115200
 cd firmware/receiver
 pio device monitor -p COM10 -b 115200
 ```
+
+## Link Monitor
+
+Aplikasi Windows lokal untuk memantau log serial Controller dan Receiver secara bersamaan tersedia di [tools/link_monitor](tools/link_monitor/). Monitor tidak mengubah firmware atau memakai radio tambahan. Baca [docs/LINK_MONITOR.md](docs/LINK_MONITOR.md) untuk arti metrik, batas ACK estimasi, replay, dan validasi hardware.
 
 ## Development Rules
 
