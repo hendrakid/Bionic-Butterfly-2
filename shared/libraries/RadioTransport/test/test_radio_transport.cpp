@@ -1,6 +1,6 @@
 #include "support/esp_test_helpers.h"
 
-#include <RadioTransport.h>
+#include <EspNowTransport.h>
 
 #include <cassert>
 #include <cstring>
