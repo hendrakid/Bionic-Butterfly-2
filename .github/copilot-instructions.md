@@ -25,6 +25,15 @@ Both projects use:
 - nRF24L01 is a future transport.
 - Do not implement nRF24L01 prematurely.
 
+## Source File Organization
+
+- Place implementation files under `src/<responsibility>/`, grouped by their primary responsibility.
+- Keep `src/` for the firmware entry point and files that do not belong to a specific responsibility.
+- Use clear, consistent subfolder names such as `input/`, `control/`, `transport/`, `ui/`, `safety/`, and `output/`.
+- Keep each header and its implementation in the same responsibility folder where practical.
+- Do not create a new folder for a single file unless it improves clarity or supports the existing architecture.
+- Preserve PlatformIO build discovery when adding or moving source files.
+
 ## Fixed Project Decisions
 
 - ESP-NOW Wi-Fi channel: 6.
