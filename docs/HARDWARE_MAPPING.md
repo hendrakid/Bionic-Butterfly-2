@@ -5,14 +5,16 @@
 
 | Component | GPIO |
 |---|---:|
-| Left joystick X | 34 |
-| Left joystick Y | 35 |
-| Right joystick X | 32 |
-| Right joystick Y | 33 |
+| Left joystick X | 32 |
+| Left joystick Y | 33 |
+| Right joystick X | 34 |
+| Right joystick Y | 35 |
 | OLED SDA | 21 |
 | OLED SCL | 22 |
-| ARM button | 27 |
-| Active buzzer driver | 25 |
+| ARM button | 13 |
+| Active buzzer driver | 27 |
+
+ARM button uses `INPUT_PULLUP` and is active-low (pressed to GND).
 
 All joystick inputs must use ADC1.
 
@@ -23,9 +25,7 @@ All joystick inputs must use ADC1.
 | Left servo signal | 4 |
 | Right servo signal | 5 |
 
-Receiver GPIOs are provisional.
-
-Verify actual board pinout before implementation.
+Servo GPIO assignments and all measured pin behavior remain subject to verification on the actual boards. Confirm GPIO32-GPIO35 are ADC1-capable inputs on the selected controller board. Measure joystick ADC endpoints and center; do not use nominal ADC assumptions.
 
 ## Power
 
