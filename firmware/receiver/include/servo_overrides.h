@@ -4,12 +4,13 @@
 
 namespace ReceiverOverrides {
 
-// Zero mechanical placeholders are not valid operating values.
+// Candidate pulse and angle ranges are unmeasured; keep PWM gated until verified.
 inline constexpr Butterfly::MotionConfig MOTION = [] {
     Butterfly::MotionConfig motion{};
-    motion.lowerDeg = 0.0F;
-    motion.upperDeg = 0.0F;
-    motion.differentialLimitDeg = 0.0F;
+    motion.maximumFrequencyHz = 4.0F;
+    motion.lowerDeg = -45.0F;
+    motion.upperDeg = 45.0F;
+    motion.differentialLimitDeg = 10.0F;
     motion.steeringGain = 1.0F;
     motion.steeringTrimDeg = 0.0F;
     motion.waveform = Butterfly::Waveform::Sine;
@@ -18,13 +19,11 @@ inline constexpr Butterfly::MotionConfig MOTION = [] {
 
 inline constexpr Butterfly::ServoCalibration LEFT_SERVO = [] {
     Butterfly::ServoCalibration servo{};
-    servo.angleMinDeg = 0.0F;
-    servo.angleMaxDeg = 0.0F;
-    servo.pulseMinUs = 0;
-    servo.centerPulseUs = 0;
-    servo.pulseMaxUs = 0;
+    servo.angleMinDeg = -45.0F;
+    servo.angleMaxDeg = 45.0F;
+    servo.pulseMinUs = 1000;
+    servo.pulseMaxUs = 2000;
     servo.trimDeg = 0.0F;
-    servo.safeAngleDeg = 0.0F;
     servo.reversed = false;
     servo.slewDegPerSecond = 0.0F;
     return servo;
@@ -32,13 +31,11 @@ inline constexpr Butterfly::ServoCalibration LEFT_SERVO = [] {
 
 inline constexpr Butterfly::ServoCalibration RIGHT_SERVO = [] {
     Butterfly::ServoCalibration servo{};
-    servo.angleMinDeg = 0.0F;
-    servo.angleMaxDeg = 0.0F;
-    servo.pulseMinUs = 0;
-    servo.centerPulseUs = 0;
-    servo.pulseMaxUs = 0;
+    servo.angleMinDeg = -45.0F;
+    servo.angleMaxDeg = 45.0F;
+    servo.pulseMinUs = 1000;
+    servo.pulseMaxUs = 2000;
     servo.trimDeg = 0.0F;
-    servo.safeAngleDeg = 0.0F;
     servo.reversed = false;
     servo.slewDegPerSecond = 0.0F;
     return servo;

@@ -46,9 +46,9 @@ DISARMED
 
 - Do not use invalid packets.
 - Do not use stale channel values.
-- On DISARM or failsafe, stop oscillation, move both servos gradually to the separately configured mechanically safe positions, and hold there.
-- Mechanical safe position is not assumed to equal pulse midpoint or servo center and must be validated physically.
-- Do not assume zero-degree position is safe.
+- On DISARM or failsafe, stop oscillation and move both servos gradually to their individually trimmed center pulses, then hold there. Reversal does not change the center.
+- The trimmed center is the selected safe command; verify it is mechanically safe for both wings before commissioning. A calculated midpoint alone does not establish physical safety.
+- A disconnected, faulted, or uncommissioned PWM driver cannot guarantee physical shaft position.
 
 ## ARM Request and Acknowledgment
 
@@ -56,9 +56,13 @@ CH5=1000 requests DISARM; CH5=2000 requests ARM; intermediate values are treated
 
 ## Flapping Control and Servo Configuration
 
-CH1 maps linearly from 1000-2000 to 0-5 Hz. CH2 maps 1000/1500/2000 to maximum left differential / zero / maximum right differential, applying configured steering gain and trim then limiting to configured differential bounds. Other channels are ignored. Both servos alternate in opposite phase, with differential applied to swing amplitudes rather than center. Sinusoidal waveform is the default; triangular is an optional configuration. At 0 Hz while armed, hold each effective center.
+CH1 maps linearly from 1000-2000 to 0-configured maximum frequency (5 Hz default and hard upper limit; the supplied override requests 4 Hz). CH2 maps 1000/1500/2000 to maximum left differential / zero / maximum right differential, applying configured steering gain and trim then limiting to configured differential bounds. Other channels are ignored. Both servos alternate in opposite phase, with differential applied to swing amplitudes rather than center. Sinusoidal waveform is the default; triangular is an optional configuration. At 0 Hz while armed, hold each effective center.
 
-Effective center pulse is the measured center pulse plus the pulse-equivalent of per-servo trim degrees using that servo's calibrated angle-to-pulse mapping. Clamp angles and pulses to configured and mechanically validated limits. No mechanical endpoint, amplitude, pulse, safe-angle, or slew default is considered measured. The compile-time fallback disables commissioning and PWM entirely. Before enabling the output, supply a measured `servo_overrides.h` with `ReceiverOverrides::MOTION` and `ReceiverOverrides::SERVOS` typed as `Butterfly::MotionConfig` and `Butterfly::ServoConfig`; both configurations must validate, `measurementsConfirmed` and `commissioningEnabled` must be true. An absent/invalid override falls back to disabled defaults. Do not set those flags merely to obtain an ARM ACK. The configured safe-angle pulse is written at first attach; actual shaft position is unknown without feedback. DISARM/failsafe commands slew from the last commanded position to safe and hold it; a PWM/driver fault may prevent physical movement.
+`ServoCalibration::centerPulseUs()` is computed, never manually assigned: round(clamp((pulseMinUs + pulseMaxUs) / 2 + trimUs, pulseMinUs, pulseMaxUs)). Let halfSpanUs = (pulseMaxUs - pulseMinUs) / 2. For negative trim, trimUs = trimDeg / (-angleMinDeg) * halfSpanUs; otherwise trimUs = trimDeg / angleMaxDeg * halfSpanUs. Untrimmed angle zero maps to the pulse midpoint. Armed targets add trim once after reversal and are clamped to the angle and pulse limits; DISARM, failsafe, and zero-frequency ARM share the trimmed center. There is no independent safe-angle setting.
+
+Default candidates: maximum 5 Hz, amplitude -90/+90 degrees, differential 15 degrees, angle endpoints -90/+90 degrees, pulses 500/2500 us. Supplied overrides: maximum 4 Hz, amplitude -45/+45 degrees, differential 10 degrees, angle endpoints -45/+45 degrees, pulses 1000/2000 us. Both use zero per-servo/steering trims, steering gain 1 (100%), and Sine. Both centers compute to 1500 us with zero trim. Steering can request excursions beyond these angle limits (105 degrees default or 55 degrees override); output clamps them, clipping the waveform rather than increasing mechanical travel. Verify or reduce amplitudes/differential before commissioning.
+
+None of these candidates are measured. Defaults and supplied overrides keep `measurementsConfirmed=false`, `commissioningEnabled=false`, output interval 0, and slew 0; PWM stays disabled. Missing overrides use defaults. A valid motion override is selected independently of the servo commissioning gate; an invalid motion override uses motion defaults. Servo overrides are passed to output validation without being marked measured. Before output can start, measured servo calibration, a positive finite slew rate, and an output interval of 1-1000 ms are required along with both flags true. Invalid servo overrides inhibit PWM (and latch an initialization fault if commissioning was requested), rather than silently enabling different endpoints. Do not set the flags merely to obtain an ARM ACK. The calculated trimmed center is written at first attach; actual shaft position is unknown without feedback. DISARM/failsafe commands slew from the last commanded position to that center and hold it; a PWM/driver fault may prevent physical movement.
 
 ## Testing
 

@@ -8,25 +8,26 @@ constexpr unsigned SERVO_COUNT = 2;
 enum class Waveform { Sine, Triangle };
 
 struct MotionConfig {
-    float lowerDeg = 0.0F;
-    float upperDeg = 0.0F;
-    float differentialLimitDeg = 0.0F;
+    float lowerDeg = -90.0F;
+    float upperDeg = 90.0F;
+    float differentialLimitDeg = 15.0F;
     float steeringGain = 1.0F;
     float steeringTrimDeg = 0.0F;
     Waveform waveform = Waveform::Sine;
+    float maximumFrequencyHz = 5.0F;
 };
 
 struct ServoCalibration {
-    // Angle zero maps to centerPulseUs; each side has its own measured slope.
-    float angleMinDeg = 0.0F;
-    float angleMaxDeg = 0.0F;
-    uint16_t pulseMinUs = 0;
-    uint16_t centerPulseUs = 0;
-    uint16_t pulseMaxUs = 0;
+    // Untrimmed angle zero maps to the pulse midpoint; trim shifts the safe center.
+    float angleMinDeg = -90.0F;
+    float angleMaxDeg = 90.0F;
+    uint16_t pulseMinUs = 500;
+    uint16_t pulseMaxUs = 2500;
     float trimDeg = 0.0F;
-    float safeAngleDeg = 0.0F; // Physical calibrated angle, independent of trim.
     bool reversed = false;
     float slewDegPerSecond = 0.0F;
+
+    uint16_t centerPulseUs() const;
 };
 
 struct ServoConfig {

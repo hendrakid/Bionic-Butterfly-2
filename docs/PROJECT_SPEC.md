@@ -57,7 +57,7 @@ Joystick layout: Mode 2. The KY-023 sticks return to center when released.
 - CH5: momentary ARM/DISARM toggle; 1000 = DISARM, 2000 = ARM.
 - CH6-CH12: reserved and transmitted at center (1500).
 
-CH1 maps the full calibrated vertical travel to 0-5 Hz: bottom = 1000 / 0 Hz, top = 2000 / 5 Hz, with center approximately 2.5 Hz. Apply a 5% deadzone near the bottom before scaling the remaining range. CH2 maps calibrated left/center/right to 1000/1500/2000, with a 5% deadzone on each side of center. Clamp input to calibrated endpoints and channel bounds. Use brief non-blocking ADC averaging.
+CH1 maps the full calibrated vertical travel to channel values: bottom = 1000, top = 2000, with center approximately 1500. Receiver frequency is 0 to its configured maximum (default 5 Hz, override 4 Hz, hard limit 5 Hz), with center approximately half that maximum. Apply a 5% deadzone near the bottom before scaling the remaining range. CH2 maps calibrated left/center/right to 1000/1500/2000, with a 5% deadzone on each side of center. Clamp input to calibrated endpoints and channel bounds. Use brief non-blocking ADC averaging.
 
 Calibration is currently manual configuration: CH1 lower/upper endpoints; CH2 center and left/right endpoints. Correct ADC direction from measurements on the actual board and joystick. Optional compile-time `calibration_overrides.h` values may override defaults; absent or invalid overrides fall back to defaults and require rebuild/reflash. ADC values must be measured, not assumed.
 
@@ -75,7 +75,7 @@ Intermediate CH5 values are conservatively interpreted as DISARM by the receiver
 ## 7. Receiver Behavior
 
 - Two alternating SG90 servos.
-- CH1 linearly commands flap frequency from 0-5 Hz.
+- CH1 linearly commands flap frequency from 0 to the receiver-configured maximum; the default and hard limit are 5 Hz, while the supplied override requests 4 Hz.
 - CH2 commands differential flap amplitude: 1000 = maximum left, 1500 = 0 degrees, 2000 = maximum right, subject to configured limits, steering gain, and trim.
 - CH3-CH4 and CH6-CH12 are ignored by current receiver behavior.
 - CH5 controls ARM/DISARM state.
@@ -84,7 +84,7 @@ Intermediate CH5 values are conservatively interpreted as DISARM by the receiver
 - Flapping calculations use receiver-local time and run outside radio callbacks.
 - Lower/upper amplitudes are angles relative to effective servo center; differential amplitude changes excursion, not center. Left upper/lower = upper+differential / lower-differential; right upper/lower = upper-differential / lower+differential. Servo phases are opposite.
 
-Servo mechanical limits must be configurable. Per-servo angle-to-pulse calibration and trim are required. The temporary compile-time override mechanism is optional and build-time only: valid overrides replace defaults; absent/invalid overrides fall back to an intentionally uncommissioned configuration that never attaches PWM, and changes require rebuild/reflash. The gate requires measured limits, pulse endpoints/center, independent safe positions, direction, trim, slew rate, and update interval. Persistent `save()` and `reset()` are not implemented; replace/remove this temporary mechanism when final configuration storage is implemented. DISARM/failsafe safe positions are configured independently of servo center.
+Servo mechanical limits must be configurable. Per-servo angle-to-pulse mapping uses the midpoint of pulse endpoints for untrimmed zero and converts trim degrees into pulse offset using the configured angle range; the resulting center pulse is clamped to endpoints. DISARM/failsafe target the individually trimmed centers, which must be physically verified safe before commissioning. The temporary compile-time override mechanism is optional and build-time only: missing overrides use uncommissioned defaults; valid motion overrides can be used independently of the servo gate, while invalid servo overrides inhibit PWM. Changes require rebuild/reflash. The gate requires measured angle/pulse endpoints, verified safe centers, direction, trim, slew rate, output interval, and explicit commissioning flags. Candidate endpoints in defaults and supplied overrides are not measurements. Persistent `save()` and `reset()` are not implemented; replace/remove this temporary mechanism when final configuration storage is implemented.
 
 ## 8. Safety
 

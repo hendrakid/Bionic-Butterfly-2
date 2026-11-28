@@ -5,7 +5,6 @@
 #include <cmath>
 
 namespace {
-constexpr float MAX_FREQUENCY_HZ = 5.0F;
 constexpr float TWO_PI = 6.283185307179586F;
 }
 
@@ -40,7 +39,7 @@ bool ButterflyController::update(bool armed, uint16_t ch1, uint16_t ch2, uint32_
         phaseCycles_ = static_cast<float>(std::fmod(cycles, 1.0));
     }
     wasArmed_ = true;
-    frequencyHz_ = MAX_FREQUENCY_HZ * (ch1 - RadioProtocol::CHANNEL_MIN) /
+    frequencyHz_ = config_.maximumFrequencyHz * (ch1 - RadioProtocol::CHANNEL_MIN) /
         static_cast<float>(RadioProtocol::CHANNEL_MAX - RadioProtocol::CHANNEL_MIN);
     const double steering = (static_cast<int>(ch2) - RadioProtocol::CHANNEL_CENTER) /
         static_cast<double>(RadioProtocol::CHANNEL_MAX - RadioProtocol::CHANNEL_CENTER);

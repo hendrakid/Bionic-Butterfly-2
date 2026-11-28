@@ -1,4 +1,5 @@
 #include "ServoOutput.h"
+#include "config.h"
 
 #include <cassert>
 #include <cmath>
@@ -38,9 +39,19 @@ Butterfly::ServoConfig validConfig() {
     c.commissioningEnabled = true;
     c.measurementsConfirmed = true;
     c.updateIntervalMs = 20;
-    c.servos[0] = {-30.0F, 40.0F, 1000, 1500, 2100, 5.0F, -20.0F, false, 100.0F};
-    c.servos[1] = {-25.0F, 35.0F, 1100, 1550, 2050, -3.0F, 25.0F, true, 50.0F};
+    c.servos[0] = {-30.0F, 40.0F, 1000, 2100, 5.0F, false, 100.0F};
+    c.servos[1] = {-25.0F, 35.0F, 1100, 2050, -3.0F, true, 50.0F};
     return c;
+}
+
+void testCandidateOverridesRemainUncommissioned() {
+    FakeDriver driver;
+    const auto config = ReceiverConfig::servoConfig();
+    Butterfly::ServoOutput output(driver, config);
+    assert(!output.begin(4, 5, 0));
+    assert(driver.attachCount == 0 && driver.writeCount == 0);
+    assert(config.servos[0].centerPulseUs() == 1500);
+    assert(config.servos[1].centerPulseUs() == 1500);
 }
 
 void testClosedGatePerformsNoIo() {
@@ -68,8 +79,12 @@ void testSafeInitialPulseRampAndClamp() {
     Butterfly::ServoOutput output(driver, config);
     assert(output.begin(4, 5, 100));
     assert(output.ready() && driver.attachCount == 2 && driver.writeCount == 2);
-    assert(output.lastCommandedAnglesDeg()[0] == -20.0F);
-    assert(output.lastCommandedAnglesDeg()[1] == 25.0F);
+    assert(output.lastCommandedAnglesDeg()[0] == 5.0F);
+    assert(output.lastCommandedAnglesDeg()[1] == -3.0F);
+    assert(std::fabs(driver.duties[0] * 20000.0 / 16384.0 -
+                     config.servos[0].centerPulseUs()) < 1.3);
+    assert(std::fabs(driver.duties[1] * 20000.0 / 16384.0 -
+                     config.servos[1].centerPulseUs()) < 1.3);
     assert(!output.begin(4, 5, 100));
     assert(driver.attachCount == 2);
     const float target[2] = {100.0F, 100.0F};
@@ -86,8 +101,8 @@ void testSafeInitialPulseRampAndClamp() {
     for (unsigned i = 0; i < 60; ++i) {
         assert(output.update(false, nullptr, 1140 + i * 20));
     }
-    assert(output.lastCommandedAnglesDeg()[0] == -20.0F);
-    assert(output.lastCommandedAnglesDeg()[1] == 25.0F);
+    assert(output.lastCommandedAnglesDeg()[0] == 5.0F);
+    assert(output.lastCommandedAnglesDeg()[1] == -3.0F);
 }
 
 void testInitFailureLatchesFault() {
@@ -114,17 +129,43 @@ void testMappingDirectionTrimAndValidation() {
     assert(Butterfly::physicalAngle(config.servos[1], 10.0F) == -13.0F);
     assert(Butterfly::angleToPulse(config.servos[0], -30.0F) == 1000);
     assert(Butterfly::angleToPulse(config.servos[0], 40.0F) == 2100);
-    config.servos[0].safeAngleDeg = 100.0F;
+    assert(Butterfly::angleToPulse(config.servos[0], 0.0F) == 1550);
+    assert(config.servos[0].centerPulseUs() == Butterfly::angleToPulse(config.servos[0], 5.0F));
+    assert(config.servos[1].centerPulseUs() == Butterfly::angleToPulse(config.servos[1], -3.0F));
+    config.servos[0].trimDeg = 100.0F;
     assert(!Butterfly::validate(config));
     config = validConfig();
     config.servos[1].slewDegPerSecond = std::numeric_limits<float>::infinity();
     assert(!Butterfly::validate(config));
     config = validConfig();
-    config.servos[0].centerPulseUs = config.servos[0].pulseMinUs;
+    config.servos[0].pulseMaxUs = config.servos[0].pulseMinUs;
     assert(!Butterfly::validate(config));
     config = validConfig();
     config.servos[0].trimDeg = std::numeric_limits<float>::quiet_NaN();
     assert(!Butterfly::validate(config));
+}
+
+void testCalculatedCenterWithTrimAndClamping() {
+    Butterfly::ServoCalibration servo{};
+    servo.angleMinDeg = -45.0F;
+    servo.angleMaxDeg = 45.0F;
+    servo.pulseMinUs = 1000;
+    servo.pulseMaxUs = 2000;
+    assert(servo.centerPulseUs() == 1500);
+    servo.trimDeg = 9.0F;
+    assert(servo.centerPulseUs() == 1600);
+    servo.reversed = true;
+    assert(servo.centerPulseUs() == 1600);
+    assert(Butterfly::angleToPulse(servo, Butterfly::physicalAngle(servo, 0.0F)) == 1600);
+    servo.trimDeg = -9.0F;
+    assert(servo.centerPulseUs() == 1400);
+    servo.trimDeg = 90.0F;
+    assert(servo.centerPulseUs() == 2000);
+    servo.trimDeg = -90.0F;
+    assert(servo.centerPulseUs() == 1000);
+    servo.pulseMinUs = 1001;
+    servo.trimDeg = 0.0F;
+    assert(servo.centerPulseUs() == 1501);
 }
 
 void testRolloverAndCommandFaultSafeRamp() {
@@ -132,17 +173,17 @@ void testRolloverAndCommandFaultSafeRamp() {
     Butterfly::ServoOutput output(driver, validConfig());
     const uint32_t start = std::numeric_limits<uint32_t>::max() - 10U;
     assert(output.begin(4, 5, start));
-    const float target[2] = {0.0F, 0.0F};
+    const float target[2] = {10.0F, 10.0F};
     assert(output.update(true, target, start + 20U));
-    assert(output.lastCommandedAnglesDeg()[0] == 5.0F);
+    assert(output.lastCommandedAnglesDeg()[0] == 15.0F);
     const float invalid[2] = {100.0F, std::numeric_limits<float>::quiet_NaN()};
     // Validate both commands before either channel can move toward an armed target.
     assert(!output.update(true, invalid, start + 40U));
     assert(output.faulted() && !output.ready());
-    assert(output.lastCommandedAnglesDeg()[0] == 3.0F);
-    assert(output.lastCommandedAnglesDeg()[1] == -2.0F);
+    assert(output.lastCommandedAnglesDeg()[0] == 13.0F);
+    assert(output.lastCommandedAnglesDeg()[1] == -12.0F);
     assert(!output.update(true, target, start + 60U));
-    assert(output.lastCommandedAnglesDeg()[0] == 1.0F);
+    assert(output.lastCommandedAnglesDeg()[0] == 11.0F);
     driver.failWrite = true;
     assert(!output.update(false, nullptr, start + 80U));
     assert(driver.detachCount == 2);
@@ -153,9 +194,11 @@ void testRolloverAndCommandFaultSafeRamp() {
 }
 
 int main() {
+    testCandidateOverridesRemainUncommissioned();
     testClosedGatePerformsNoIo();
     testSafeInitialPulseRampAndClamp();
     testInitFailureLatchesFault();
     testMappingDirectionTrimAndValidation();
+    testCalculatedCenterWithTrimAndClamping();
     testRolloverAndCommandFaultSafeRamp();
 }

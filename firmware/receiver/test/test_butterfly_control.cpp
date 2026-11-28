@@ -1,14 +1,27 @@
 #include "ButterflyController.h"
+#include "config.h"
 
 #include <RadioProtocol.h>
 #include <cassert>
 #include <cmath>
+#include <initializer_list>
 #include <limits>
 
 namespace {
 bool near(float a, float b, float tolerance = 0.001F) { return std::fabs(a - b) < tolerance; }
 Butterfly::MotionConfig config(Butterfly::Waveform waveform = Butterfly::Waveform::Sine) {
     return {-30.0F, 40.0F, 10.0F, 1.0F, 0.0F, waveform};
+}
+
+void testMotionOverrideIndependentOfCommissioning() {
+    ButterflyController control(ReceiverConfig::motionConfig());
+    assert(control.begin(0));
+    assert(control.update(true, 2000, 2000, 0));
+    assert(near(control.frequencyHz(), 4.0F));
+    assert(control.update(true, 2000, 2000, 63));
+    assert(control.anglesDeg()[0] > 54.0F);
+    const auto servos = ReceiverConfig::servoConfig();
+    assert(near(Butterfly::physicalAngle(servos.servos[0], control.anglesDeg()[0]), 45.0F));
 }
 
 void testFrequencyAndZeroHold() {
@@ -21,6 +34,24 @@ void testFrequencyAndZeroHold() {
     assert(near(control.frequencyHz(), 2.5F));
     assert(control.update(true, 2000, 1500, 220));
     assert(near(control.frequencyHz(), 5.0F));
+}
+
+void testConfigurableFrequencyAndValidation() {
+    auto c = config();
+    c.maximumFrequencyHz = 4.0F;
+    ButterflyController control(c);
+    assert(control.begin(0));
+    assert(control.update(true, 1500, 1500, 0));
+    assert(near(control.frequencyHz(), 2.0F));
+    assert(control.update(true, 2000, 1500, 125));
+    assert(near(control.frequencyHz(), 4.0F));
+    assert(near(control.phaseCycles(), 0.25F));
+    for (const float invalid : {0.0F, -1.0F, 5.1F,
+                               std::numeric_limits<float>::infinity(),
+                               std::numeric_limits<float>::quiet_NaN()}) {
+        c.maximumFrequencyHz = invalid;
+        assert(!Butterfly::validate(c));
+    }
 }
 
 void testOppositePhaseDifferentialAndContinuity() {
@@ -80,7 +111,9 @@ void testRolloverDisarmGainTrimAndNegativeHalf() {
 }
 
 int main() {
+    testMotionOverrideIndependentOfCommissioning();
     testFrequencyAndZeroHold();
+    testConfigurableFrequencyAndValidation();
     testOppositePhaseDifferentialAndContinuity();
     testTriangleAndInvalidInput();
     testRolloverDisarmGainTrimAndNegativeHalf();

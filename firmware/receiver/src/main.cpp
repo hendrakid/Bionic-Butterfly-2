@@ -25,7 +25,7 @@ void setup() {
         outputs.begin(Pins::SERVO_LEFT, Pins::SERVO_RIGHT, nowMs);
     receiverLink.setOutputReady(outputReady);
     if (!ReceiverConfig::overridesValid()) {
-        Serial.println("Servo measurements missing or invalid; defaults keep PWM disabled");
+        Serial.println("Servo configuration uncommissioned or invalid; PWM disabled");
     }
     if (outputs.faulted() || (ReceiverConfig::overridesValid() && !motionReady)) {
         receiverLink.setOutputFault(true);

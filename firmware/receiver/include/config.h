@@ -30,7 +30,7 @@ inline bool overridesValid() {
 
 inline Butterfly::MotionConfig motionConfig() {
 #ifdef RECEIVER_HAS_SERVO_OVERRIDE
-    if (overridesValid()) {
+    if (Butterfly::validate(ReceiverOverrides::MOTION)) {
         return ReceiverOverrides::MOTION;
     }
 #endif
@@ -39,11 +39,11 @@ inline Butterfly::MotionConfig motionConfig() {
 
 inline Butterfly::ServoConfig servoConfig() {
 #ifdef RECEIVER_HAS_SERVO_OVERRIDE
-    if (overridesValid()) {
-        return ReceiverOverrides::SERVOS;
-    }
-#endif
+    // ServoOutput validates independently; an invalid override must never enable PWM.
+    return ReceiverOverrides::SERVOS;
+#else
     return {};
+#endif
 }
 
 } // namespace ReceiverConfig

@@ -8,7 +8,9 @@ namespace Butterfly {
 bool validate(const MotionConfig& c) {
     return std::isfinite(c.lowerDeg) && std::isfinite(c.upperDeg) &&
            std::isfinite(c.differentialLimitDeg) && std::isfinite(c.steeringGain) &&
-           std::isfinite(c.steeringTrimDeg) && c.lowerDeg < 0.0F &&
+           std::isfinite(c.steeringTrimDeg) &&
+           std::isfinite(c.maximumFrequencyHz) && c.maximumFrequencyHz > 0.0F &&
+           c.maximumFrequencyHz <= 5.0F && c.lowerDeg < 0.0F &&
            c.upperDeg > 0.0F && c.differentialLimitDeg >= 0.0F &&
            c.differentialLimitDeg <= std::min(-c.lowerDeg, c.upperDeg) &&
            c.steeringGain >= 0.0F &&
@@ -24,18 +26,21 @@ bool validate(const ServoConfig& c) {
     }
     for (const auto& s : c.servos) {
         if (!std::isfinite(s.angleMinDeg) || !std::isfinite(s.angleMaxDeg) ||
-            !std::isfinite(s.trimDeg) || !std::isfinite(s.safeAngleDeg) ||
+            !std::isfinite(s.trimDeg) ||
             !std::isfinite(s.slewDegPerSecond) || s.angleMinDeg >= 0.0F ||
             s.angleMaxDeg <= 0.0F || s.pulseMinUs == 0 ||
-            s.pulseMinUs >= s.centerPulseUs || s.centerPulseUs >= s.pulseMaxUs ||
+            s.pulseMinUs >= s.pulseMaxUs ||
             s.pulseMaxUs >= 20000 || s.trimDeg < s.angleMinDeg ||
-            s.trimDeg > s.angleMaxDeg || s.safeAngleDeg < s.angleMinDeg ||
-            s.safeAngleDeg > s.angleMaxDeg || s.slewDegPerSecond <= 0.0F ||
+            s.trimDeg > s.angleMaxDeg || s.slewDegPerSecond <= 0.0F ||
             !std::isfinite(s.slewDegPerSecond * 0.001F * c.updateIntervalMs)) {
             return false;
         }
     }
     return true;
+}
+
+uint16_t ServoCalibration::centerPulseUs() const {
+    return angleToPulse(*this, trimDeg);
 }
 
 float clampAngle(const ServoCalibration& c, float angle) {
@@ -51,11 +56,10 @@ float physicalAngle(const ServoCalibration& c, float excursion) {
 
 uint16_t angleToPulse(const ServoCalibration& c, float angle) {
     angle = clampAngle(c, angle);
-    const float span = angle < 0.0F
-        ? static_cast<float>(c.centerPulseUs - c.pulseMinUs)
-        : static_cast<float>(c.pulseMaxUs - c.centerPulseUs);
+    const float midpoint = (static_cast<uint32_t>(c.pulseMinUs) + c.pulseMaxUs) / 2.0F;
+    const float span = (c.pulseMaxUs - c.pulseMinUs) / 2.0F;
     const float endpoint = angle < 0.0F ? -c.angleMinDeg : c.angleMaxDeg;
-    const float pulse = c.centerPulseUs + (angle / endpoint) * span;
+    const float pulse = midpoint + (angle / endpoint) * span;
     return static_cast<uint16_t>(std::lround(std::clamp(
         pulse, static_cast<float>(c.pulseMinUs), static_cast<float>(c.pulseMaxUs))));
 }

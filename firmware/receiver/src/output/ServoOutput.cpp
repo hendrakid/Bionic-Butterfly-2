@@ -51,7 +51,7 @@ bool ServoOutput::begin(uint8_t leftPin, uint8_t rightPin, uint32_t nowMs) {
     }
     // Actual shaft position is unknown; the first gated command is the measured safe pulse.
     for (unsigned i = 0; i < SERVO_COUNT; ++i) {
-        lastAngles_[i] = config_.servos[i].safeAngleDeg;
+        lastAngles_[i] = physicalAngle(config_.servos[i], 0.0F);
         if (!write(i, lastAngles_[i])) {
             for (unsigned attached = 0; attached < SERVO_COUNT; ++attached) {
                 driver_.detach(pins_[attached]);
@@ -80,7 +80,7 @@ bool ServoOutput::update(bool armed, const float desired[SERVO_COUNT], uint32_t 
     lastUpdateMs_ = nowMs;
     for (unsigned i = 0; i < SERVO_COUNT; ++i) {
         const auto& servo = config_.servos[i];
-        float target = servo.safeAngleDeg;
+        float target = physicalAngle(servo, 0.0F);
         if (armed) {
             target = physicalAngle(servo, desired[i]);
         }
