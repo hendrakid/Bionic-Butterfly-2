@@ -31,7 +31,7 @@ docs
 
 - Controller: non-blocking four-sample ADC input, measured calibration gate, debounced ARM button, universal 12-channel mapping, periodic control, immediate persistent DISARM, and application ACK/link state.
 - Receiver: strict packet/age/sequence validation, DISARM-priority safety state, independent 500 ms failsafe, stateful ACK, local butterfly waveform, and two calibrated LEDC servo outputs.
-- Safety gate: the repository does **not** contain guessed joystick endpoints or servo mechanical limits. Default builds communicate but inhibit ARM/output until measured compile-time overrides are supplied. OLED, buzzer, NVS, automatic pairing, and nRF24L01 remain deferred.
+- Safety gate: built-in defaults remain uncommissioned and inhibit servo PWM. The checked-in controller/servo overrides contain measured/commissioned settings for the current hardware; the user reports safely testing throttle, steering, DISARM, board restarts, link-loss timeout, and recovery without automatic ARM on 2026-11-28. Do not reuse these hardware-specific values on another setup without measurement. OLED, buzzer, NVS, automatic pairing, and nRF24L01 remain deferred.
 - PlatformIO is pinned to pioarduino ESP32 platform 53.03.13 / Arduino core 3.1.3, the verified baseline for the current ESP-NOW and LEDC APIs.
 
 ## Build Controller
@@ -89,40 +89,28 @@ The same compiler flags and temporary-executable cleanup apply to the focused te
 
 1. Verify actual board revision/pinout, installed wiring, ADC1 inputs, button polarity, regulated servo supply/common ground, and actual STA MACs against [hardware mapping](docs/HARDWARE_MAPPING.md). The corrected source pins are targets, not physical verification.
 2. Controller [calibration overrides](firmware/controller/include/calibration_overrides.h) use the supplied hardware capture: CH1 bottom/top=4095/0 and CH2 left/center/right=4095/1890/0, with `measured=true`. Firmware explicitly uses the measurement settings: 12-bit ADC and 11 dB attenuation. `ChannelManager::Calibration` defaults contain the same numeric values but keep `measured=false`; missing/invalid overrides therefore keep CH1/CH5=1000 and other channels=1500. Re-measure after changing joystick hardware or ADC settings and verify mapped channel directions before operating the receiver.
-3. Receiver [servo override template](firmware/receiver/include/servo_overrides.h) contains candidate maximum 4 Hz, amplitude -45/+45 degrees, differential 10 degrees, angle endpoints -45/+45 degrees, pulse endpoints 1000/2000 us, zero trim, gain 1, and Sine. The built-in candidates are 5 Hz, -90/+90 degrees, 15 degrees differential, angle endpoints -90/+90 degrees, and 500/2500 us. Both have the commissioning flags false and no validated interval or slew; PWM stays disabled. The calculated center is the pulse midpoint plus the per-servo degree-trim converted into pulse offset; DISARM/failsafe target that trimmed center. These candidate numbers are **not hardware measurements**. Record verified endpoints, safe trimmed centers, direction, safe-transition slew, and output interval; steering may clip against endpoints. Enable `measurementsConfirmed`/`commissioningEnabled` only after physical checks, then rebuild/reflash.
-4. Run radio-only tests first. Test measured servo pulses without linkage, DISARM, link loss, ARM-only recovery rejection, and fresh DISARM/ARM recovery. No build or host test certifies servo motion or radio range. SG90 has no shaft feedback; safe transition tracks commanded, not measured, position.
+3. Receiver [servo overrides](firmware/receiver/include/servo_overrides.h) currently configure maximum 4 Hz, amplitude -60/+60 degrees, differential 10 degrees, angle endpoints -90/+90 degrees, pulse endpoints 500/2500 us, zero trim, gain 1, Sine, 1000 degrees/second slew, and 20 ms output interval. The commissioning flags are enabled for the current tested hardware. These values must not be reused on another mechanism without measurement. The calculated center is the pulse midpoint plus the per-servo degree-trim converted into pulse offset; DISARM/failsafe target that trimmed center. Steering may clip against endpoints. Built-in defaults remain uncommissioned and keep PWM disabled.
+4. The user reports safe physical tests on 2026-11-28 covering measured servo operation, ARM/throttle/steering/DISARM, Controller/Receiver restarts, link loss through timeout, and recovery without automatic ARM. For repeatable evidence, capture serial logs and record board IDs, actual MACs, supply measurements, pulse endpoints, and measured timeout. SG90 has no shaft feedback; safe transition tracks commanded, not measured, position.
 
 The serial ports below are examples from earlier setup; detect the current ports before upload. No automatic upload is performed by the build.
 
-## Upload Controller
+## Controller
 
 Port serial controller: `COM4`.
 
 ```shell
 cd firmware/controller
 pio run -t upload --upload-port COM4
+pio device monitor -p COM4 -b 115200
 ```
 
-## Upload Receiver
+## Receiver
 
 Port serial receiver: `COM10`.
 
 ```shell
 cd firmware/receiver
 pio run -t upload --upload-port COM10
-```
-
-## Serial Monitor
-
-Pilih port sesuai board yang ingin dipantau:
-
-```shell
-# Controller
-cd firmware/controller
-pio device monitor -p COM4 -b 115200
-
-# Receiver
-cd firmware/receiver
 pio device monitor -p COM10 -b 115200
 ```
 

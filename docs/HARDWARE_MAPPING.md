@@ -25,9 +25,9 @@ All joystick inputs must use ADC1. At commissioning, trace each installed signal
 | Left servo signal | 4 |
 | Right servo signal | 5 |
 
-Servo GPIO assignments and all measured pin behavior remain subject to verification on the actual boards. Confirm GPIO32-GPIO35 are ADC1-capable inputs on the selected controller board. Measure joystick ADC endpoints and center; do not use nominal ADC assumptions.
+The user reports that the installed receiver and servos operated safely on the configured GPIO4/GPIO5 during the hardware tests recorded below. This confirms functional operation for that setup, but does not replace recording board revisions, pinout, actual STA MACs, servo pulse endpoints, or electrical measurements. Confirm GPIO32-GPIO35 are ADC1-capable inputs on the selected controller board and retain measured joystick calibration for the installed hardware.
 
-The receiver board definition remains `esp32-c3-devkitm-1`; successful compilation does not prove compatibility with the exact SuperMini revision. Verify GPIO4/GPIO5, USB mode, actual STA MACs, and LEDC waveforms on the installed boards. Servo PWM uses two Arduino core 3 LEDC outputs at 50 Hz/14-bit resolution only after measured configuration and commissioning gates pass. The 50 Hz carrier is distinct from the 0–5 Hz commanded flapping rate; validate both physically. With absent/invalid overrides no servo pin is attached to PWM. OLED and buzzer are intentionally not driven by this MVP.
+The receiver board definition is `esp32-c3-devkitm-1`. Servo PWM uses two Arduino core 3 LEDC outputs at 50 Hz/14-bit resolution when the commissioning gate passes. The 50 Hz carrier is distinct from the 0–5 Hz commanded flapping rate. The checked-in servo overrides currently enable commissioning; their settings must only be used for the tested hardware. With absent/invalid overrides no servo pin is attached to PWM. OLED and buzzer are intentionally not driven by this MVP.
 
 ## Power
 
@@ -37,3 +37,7 @@ The receiver board definition remains `esp32-c3-devkitm-1`; successful compilati
 - Use appropriate decoupling.
 - Verify servo stall current and supply capacity.
 - Use a driver for the 5V active buzzer.
+
+## Reported Commissioning Tests — 2026-11-28
+
+With the servos installed and the current firmware configuration, the user reports safe operation through ARM, throttle top/center/bottom, steering left/center/right, and DISARM; restart of either board; and link loss through timeout followed by recovery without automatic ARM. Exact pulse widths, supply measurements, and timeout duration were not recorded here. See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the test scope and remaining validation.

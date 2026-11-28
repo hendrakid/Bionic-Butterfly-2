@@ -30,7 +30,7 @@ DISARMED
 
 ## Initial Timeout
 
-500 ms since the last accepted valid control packet, subject to hardware validation.
+Configured for 500 ms since the last accepted valid control packet. The user reports testing link loss through timeout and recovery without automatic ARM on 2026-11-28; an exact measured timeout duration was not recorded.
 
 - Measure elapsed time, not the number of missed packets.
 - At the 100 ms transmission interval, 500 ms corresponds to five transmission intervals.
@@ -60,18 +60,21 @@ CH1 maps linearly from 1000-2000 to 0-configured maximum frequency (5 Hz default
 
 `ServoCalibration::centerPulseUs()` is computed, never manually assigned: round(clamp((pulseMinUs + pulseMaxUs) / 2 + trimUs, pulseMinUs, pulseMaxUs)). Let halfSpanUs = (pulseMaxUs - pulseMinUs) / 2. For negative trim, trimUs = trimDeg / (-angleMinDeg) * halfSpanUs; otherwise trimUs = trimDeg / angleMaxDeg * halfSpanUs. Untrimmed angle zero maps to the pulse midpoint. Armed targets add trim once after reversal and are clamped to the angle and pulse limits; DISARM, failsafe, and zero-frequency ARM share the trimmed center. There is no independent safe-angle setting.
 
-Default candidates: maximum 5 Hz, amplitude -90/+90 degrees, differential 15 degrees, angle endpoints -90/+90 degrees, pulses 500/2500 us. Supplied overrides: maximum 4 Hz, amplitude -45/+45 degrees, differential 10 degrees, angle endpoints -45/+45 degrees, pulses 1000/2000 us. Both use zero per-servo/steering trims, steering gain 1 (100%), and Sine. Both centers compute to 1500 us with zero trim. Steering can request excursions beyond these angle limits (105 degrees default or 55 degrees override); output clamps them, clipping the waveform rather than increasing mechanical travel. Verify or reduce amplitudes/differential before commissioning.
+Built-in defaults: maximum 5 Hz, amplitude -90/+90 degrees, differential 15 degrees, angle endpoints -90/+90 degrees, pulses 500/2500 us. The current checked-in overrides configure maximum 4 Hz, amplitude -60/+60 degrees, differential 10 degrees, angle endpoints -90/+90 degrees, pulses 500/2500 us, zero trims, steering gain 1 (100%), Sine, slew 1000 degrees/second, and a 20 ms output interval. The override sets `measurementsConfirmed=true` and `commissioningEnabled=true`; the user reports testing the current configuration with servos installed and observing safe behavior. These values apply to that tested hardware/configuration and are not general SG90 calibration values. Steering may request excursions beyond the configured motion amplitude (70 degrees with the current override); output clamps at configured angle limits.
 
-None of these candidates are measured. Defaults and supplied overrides keep `measurementsConfirmed=false`, `commissioningEnabled=false`, output interval 0, and slew 0; PWM stays disabled. Missing overrides use defaults. A valid motion override is selected independently of the servo commissioning gate; an invalid motion override uses motion defaults. Servo overrides are passed to output validation without being marked measured. Before output can start, measured servo calibration, a positive finite slew rate, and an output interval of 1-1000 ms are required along with both flags true. Invalid servo overrides inhibit PWM (and latch an initialization fault if commissioning was requested), rather than silently enabling different endpoints. Do not set the flags merely to obtain an ARM ACK. The calculated trimmed center is written at first attach; actual shaft position is unknown without feedback. DISARM/failsafe commands slew from the last commanded position to that center and hold it; a PWM/driver fault may prevent physical movement.
+Built-in defaults remain uncommissioned and keep PWM disabled. Missing overrides use defaults. A valid motion override is selected independently of the servo commissioning gate; an invalid motion override uses motion defaults. Servo overrides are passed to output validation; enabling the flags permits PWM only when the full servo config is valid. Before enabling commissioning on other hardware, measure pulse/angle limits, verify safe centers and direction, and set a positive finite slew rate and an output interval of 1-1000 ms. Invalid servo overrides inhibit PWM (and latch an initialization fault if commissioning was requested), rather than silently enabling different endpoints. Do not set the flags merely to obtain an ARM ACK. The calculated trimmed center is written at first attach; actual shaft position is unknown without feedback. DISARM/failsafe commands slew from the last commanded position to that center and hold it; a PWM/driver fault may prevent physical movement.
 
 ## Testing
 
 Serial monitoring distinguishes `rx_frames` (nonempty, size-acceptable frames received by the transport before application validation), `controls` (validated controls), `expired` (queued frames rejected for age), and `future` (expired frames whose timestamp appears later than the processing clock). `acks` counts ACK send submissions accepted by the transport; `radio_ok` counts successful radio send callbacks. Only the controller's `confirmed_acks` confirms application ACK reception. Compare counter deltas and note that the two boards' logging boundaries can differ.
 
-- Disconnect controller.
-- Power-cycle controller.
-- Power-cycle receiver.
-- Send invalid packets.
-- Simulate packet loss.
-- Test reconnection.
-- Verify DISARM behavior.
+### User-reported tests — 2026-11-28
+
+With the current configuration and servos installed, the user reports testing link loss through timeout, recovery without automatic ARM, restarting either board, and the ARM/throttle/steering/DISARM sequence safely. The exact timeout duration, serial ACK trace, and performance under extended packet loss were not recorded.
+
+### Further validation
+
+- Capture synchronized logs to confirm DISARMED, ARMED, and FAILSAFE ACK status and the recovery sequence.
+- Record measured timeout duration and test sustained/intermittent packet loss and queue pressure.
+- Test invalid/malformed packets and verify they do not refresh timeout or change outputs, using safe host fixtures where appropriate.
+- Confirm servo safe-center pulse and recovery behavior on the installed mechanism.

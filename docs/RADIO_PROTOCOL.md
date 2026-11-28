@@ -57,7 +57,7 @@ Receiver must verify:
 - Application-level ACK required. Controller link confirmation and `disarmConfirmed` are based on validated ACKs from the configured receiver, never ESP-NOW send callbacks.
 - ACKs carrying any defined receiver state (DISARMED, ARMED, FAILSAFE) confirm application receipt. Receiver state and link confirmation remain separate. Older matching ACKs may retire their pending slot but cannot overwrite newer receiver status.
 - ACK references received sequence.
-- Receiver link timeout is 500 ms since the last accepted valid control packet, subject to hardware validation; reaching this timeout triggers failsafe.
+- Receiver link timeout is configured at 500 ms since the last accepted valid control packet; reaching it triggers failsafe. The user reports testing link loss through timeout and recovery without automatic ARM on 2026-11-28. Exact measured timeout duration and synchronized serial evidence are not recorded.
 - The receiver timeout is measured by elapsed time, not by counting missed packets; 500 ms corresponds to five transmission intervals.
 - Invalid, duplicate, stale, future-dated, or expired queued packets must not reset the receiver timeout or update outputs. A fresh processing clock is sampled during drain; the >=500 ms gap is checked before newly received controls can conceal it.
 - Sequence tracking resets on timeout so a restarted controller can resume from zero. Frames queued before that timeout boundary are rejected. Recovery remains non-ARMED until a valid DISARM and then a fresh ARM in a later drain.
@@ -72,7 +72,7 @@ Receiver must verify:
 - Both devices emit cumulative serial counters approximately once per second. Compare `CTRL controls` with `RX controls` for control delivery, `RX acks` with `CTRL confirmed_acks` for ACK delivery/loss, and use `CTRL ack_rtt_ms` for end-to-end application ACK latency. These are observations, not pass/fail thresholds.
 - `rx_overflow` and `rx_high` report queue pressure; `radio_ok`/`radio_fail` are MAC-layer callback outcomes only and must not be treated as application delivery.
 - Link events report receiver timeout and recovery; controller recovery latency is measured from its link-stale transition to a valid ACK. Capture both serial logs with synchronized run start and sequence numbers.
-- Baseline procedure: run both boards at 1 m with fixed antennas/orientation for a documented duration, record board/build IDs and actual STA MACs, then compare counters and RTT. Repeat controlled disconnect/reconnect cycles to measure recovery. No performance threshold is set until baseline data exists.
+- Baseline procedure: run both boards at 1 m with fixed antennas/orientation for a documented duration, record board/build IDs and actual STA MACs, then compare counters and RTT. Repeat controlled disconnect/reconnect cycles to measure recovery. The user reports functional link-loss timeout and no-auto-ARM recovery tests passed; synchronized counter/RTT baseline and performance thresholds remain unrecorded.
 - With no commissioned mechanical configuration the receiver remains output-disabled; valid link controls still receive stateful ACKs and ARM is rejected. Radio-only validation must precede physical servo commissioning.
 
 ### Desktop Link Monitor

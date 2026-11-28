@@ -2,7 +2,7 @@
 # Bionic Butterfly - Project Specification
 
 Version: 1.0.0
-Status: Firmware MVP implemented; hardware commissioning pending
+Status: Firmware MVP implemented; functional commissioning tests for the current hardware/configuration reported passed (2026-11-28); additional quantitative measurements are not yet recorded
 
 ## 1. Overview
 
@@ -42,7 +42,7 @@ Pairing: Static MAC
 Transmission: Unicast
 Application ACK: Required
 Periodic control transmission interval: 100 ms (10 Hz)
-Receiver link timeout: 500 ms since the last accepted valid control packet, subject to hardware validation
+Receiver link timeout: configured at 500 ms since the last accepted valid control packet; user-reported timeout and recovery test passed on 2026-11-28
 
 Future transport:
 - nRF24L01
@@ -106,13 +106,25 @@ Servo mechanical limits must be configurable. Per-servo angle-to-pulse mapping u
 - Explicit hardware configuration.
 - Test each feature independently.
 
-## 10. Initial Hardware Validation
+## 10. Hardware Validation
 
-- Verify actual controller/receiver boards and pinout; confirm GPIO32-GPIO35 are ADC1 inputs on the chosen controller.
-- Measure calibrated channel output at stick endpoints and center; confirm deadzones, filtering latency, and endpoint clamping.
-- Confirm DISARMED, ARMED, and FAILSAFE ACK handling, and that link recovery never arms without a new explicit request.
-- Verify servo direction, pulse calibration, safe positions, mechanical limits, and both waveforms without wing linkage. Begin with low configured amplitude and frequency; increase only after free motion is confirmed.
-- Stop testing if a servo buzzes, heats, hits a stop, or linkage binds. Validate ability to follow configured frequency/amplitude before testing up to 5 Hz. At CH1 center, armed receiver command is approximately 2.5 Hz.
+### User-reported tests — 2026-11-28
+
+With the current Controller/Receiver configuration and servos installed, the user reports safe operation for:
+
+- ARM, throttle at top/center/bottom, steering left/center/right, then DISARM.
+- Restarting either the Controller or Receiver.
+- Link loss through the receiver timeout and recovery without automatic ARM.
+
+These user-reported functional tests are recorded as passed for the tested setup. Serial capture, exact measured timeout duration, radio range, and electrical measurements were not supplied; these are optional quantitative follow-up records, not prerequisites for recording the functional commissioning result.
+
+### Additional quantitative records
+
+- Record board revisions, wiring/pinout, actual STA MACs, and confirm the controller ADC inputs are ADC1-capable.
+- Record calibrated ADC and output channel readings at stick endpoints and center, including deadzone and filtering behavior.
+- Capture ACK states, timeout timing, and recovery sequence from synchronized serial logs; stress queue capacity and radio link under the intended operating conditions.
+- Verify servo pulse endpoints, direction, safe centers, supply behavior, and configured waveform/mechanical limits. Increase motion only after safe free movement is confirmed.
+- Stop testing if a servo buzzes, heats, hits a stop, or linkage binds. At CH1 center, armed receiver command is approximately 2.5 Hz.
 
 ## 11. Out of Scope for MVP
 
