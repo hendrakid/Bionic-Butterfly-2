@@ -60,10 +60,27 @@ void loop() {
     }
     if (armButton.update(nowMs, digitalRead(Pins::ARM_BUTTON) == LOW)) {
         const bool wasArmed = controllerState.requestedArm();
-        if (controllerState.onShortPress(link.connectionConfirmed,
-                                         controllerLink.disarmConfirmed(), calibrated,
-                                         link.lastAcknowledgedSequence) && wasArmed) {
+        const bool disarmConfirmed = controllerLink.disarmConfirmed();
+        const bool accepted = controllerState.onShortPress(
+            link.connectionConfirmed, disarmConfirmed, calibrated,
+            link.lastAcknowledgedSequence);
+        if (accepted && wasArmed) {
             controllerLink.requestDisarm(nowMs);
+        }
+        if (accepted) {
+            Serial.printf("CTRL arm_button=short_press result=accepted request=%s link=%u disarm_ack=%u calibrated=%u\n",
+                          controllerState.requestedArm() ? "ARM" : "DISARM",
+                          link.connectionConfirmed ? 1U : 0U,
+                          disarmConfirmed ? 1U : 0U,
+                          calibrated ? 1U : 0U);
+        } else {
+            const char* reason = !link.connectionConfirmed ? "link_unconfirmed"
+                : !disarmConfirmed ? "disarm_unconfirmed"
+                : !calibrated ? "input_uncalibrated" : "rejected";
+            Serial.printf("CTRL arm_button=short_press result=ignored reason=%s link=%u disarm_ack=%u calibrated=%u\n",
+                          reason, link.connectionConfirmed ? 1U : 0U,
+                          disarmConfirmed ? 1U : 0U,
+                          calibrated ? 1U : 0U);
         }
     }
     const InputManager::RawSnapshot raw = inputs.rawSnapshot();

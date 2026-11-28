@@ -44,12 +44,11 @@ Butterfly::ServoConfig validConfig() {
     return c;
 }
 
-void testCandidateOverridesRemainUncommissioned() {
-    FakeDriver driver;
+void testCommissionedOverridesValidate() {
     const auto config = ReceiverConfig::servoConfig();
-    Butterfly::ServoOutput output(driver, config);
-    assert(!output.begin(4, 5, 0));
-    assert(driver.attachCount == 0 && driver.writeCount == 0);
+    assert(config.commissioningEnabled && config.measurementsConfirmed);
+    assert(Butterfly::validate(config));
+    assert(config.updateIntervalMs == 20);
     assert(config.servos[0].centerPulseUs() == 1500);
     assert(config.servos[1].centerPulseUs() == 1500);
 }
@@ -194,7 +193,7 @@ void testRolloverAndCommandFaultSafeRamp() {
 }
 
 int main() {
-    testCandidateOverridesRemainUncommissioned();
+    testCommissionedOverridesValidate();
     testClosedGatePerformsNoIo();
     testSafeInitialPulseRampAndClamp();
     testInitFailureLatchesFault();

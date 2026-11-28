@@ -4,12 +4,12 @@
 
 namespace ReceiverOverrides {
 
-// Candidate pulse and angle ranges are unmeasured; keep PWM gated until verified.
+// Commissioned values supplied and physically verified by the user.
 inline constexpr Butterfly::MotionConfig MOTION = [] {
     Butterfly::MotionConfig motion{};
     motion.maximumFrequencyHz = 4.0F;
-    motion.lowerDeg = -45.0F;
-    motion.upperDeg = 45.0F;
+    motion.lowerDeg = -60.0F;
+    motion.upperDeg = 60.0F;
     motion.differentialLimitDeg = 10.0F;
     motion.steeringGain = 1.0F;
     motion.steeringTrimDeg = 0.0F;
@@ -19,36 +19,36 @@ inline constexpr Butterfly::MotionConfig MOTION = [] {
 
 inline constexpr Butterfly::ServoCalibration LEFT_SERVO = [] {
     Butterfly::ServoCalibration servo{};
-    servo.angleMinDeg = -45.0F;
-    servo.angleMaxDeg = 45.0F;
-    servo.pulseMinUs = 1000;
-    servo.pulseMaxUs = 2000;
+    servo.angleMinDeg = -90.0F;
+    servo.angleMaxDeg = 90.0F;
+    servo.pulseMinUs = 500;
+    servo.pulseMaxUs = 2500;
     servo.trimDeg = 0.0F;
     servo.reversed = false;
-    servo.slewDegPerSecond = 0.0F;
+    servo.slewDegPerSecond = 1000.0F;
     return servo;
 }();
 
 inline constexpr Butterfly::ServoCalibration RIGHT_SERVO = [] {
     Butterfly::ServoCalibration servo{};
-    servo.angleMinDeg = -45.0F;
-    servo.angleMaxDeg = 45.0F;
-    servo.pulseMinUs = 1000;
-    servo.pulseMaxUs = 2000;
+    servo.angleMinDeg = -90.0F;
+    servo.angleMaxDeg = 90.0F;
+    servo.pulseMinUs = 500;
+    servo.pulseMaxUs = 2500;
     servo.trimDeg = 0.0F;
     servo.reversed = false;
-    servo.slewDegPerSecond = 0.0F;
+    servo.slewDegPerSecond = 1000.0F;
     return servo;
 }();
 
 inline constexpr Butterfly::ServoConfig SERVOS = [] {
     Butterfly::ServoConfig config{};
     // Enable only after measured configuration and physical safety checks are complete.
-    config.commissioningEnabled = false;
-    config.measurementsConfirmed = false;
+    config.commissioningEnabled = true;
+    config.measurementsConfirmed = true;
     config.servos[0] = LEFT_SERVO;
     config.servos[1] = RIGHT_SERVO;
-    config.updateIntervalMs = 0;
+    config.updateIntervalMs = 20;
     return config;
 }();
 

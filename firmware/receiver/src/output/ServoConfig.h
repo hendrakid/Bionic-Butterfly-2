@@ -35,7 +35,7 @@ struct ServoConfig {
     bool commissioningEnabled = false;
     bool measurementsConfirmed = false;
     ServoCalibration servos[SERVO_COUNT]{};
-    uint32_t updateIntervalMs = 0;
+    uint32_t updateIntervalMs = 20;
 };
 
 bool validate(const MotionConfig& config);
