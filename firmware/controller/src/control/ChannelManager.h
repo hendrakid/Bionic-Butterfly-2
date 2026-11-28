@@ -6,10 +6,10 @@
 class ChannelManager {
 public:
     struct Calibration {
-        uint16_t ch1Bottom = 0;
+        uint16_t ch1Bottom = 4095;
         uint16_t ch1Top = 0;
-        uint16_t ch2Left = 0;
-        uint16_t ch2Center = 0;
+        uint16_t ch2Left = 4095;
+        uint16_t ch2Center = 1890;
         uint16_t ch2Right = 0;
         // Set only after measuring all endpoints and center on the actual hardware.
         bool measured = false;

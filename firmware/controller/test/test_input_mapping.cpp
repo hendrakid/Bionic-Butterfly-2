@@ -1,6 +1,7 @@
 #include "input/ArmButton.h"
 #include "input/InputManager.h"
 #include "control/ChannelManager.h"
+#include "config.h"
 #include <RadioProtocol.h>
 
 #include <cassert>
@@ -124,6 +125,25 @@ void testMappingIncreasingAndClamps() {
     assert(channels[1] < 1500);
 }
 
+void testConfiguredCalibrationMapping() {
+    const auto calibration = ControllerConfig::inputCalibration();
+    uint16_t channels[12]{};
+    assert(ChannelManager::map(4095, 4095, calibration, channels, false));
+    assert(channels[0] == 1000 && channels[1] == 1000 && channels[4] == 1000);
+    assertReservedCentered(channels);
+    assert(ChannelManager::map(0, 0, calibration, channels, true));
+    assert(channels[0] == 2000 && channels[1] == 2000 && channels[4] == 2000);
+    for (uint16_t neutral = 1888; neutral <= 1904; ++neutral) {
+        assert(ChannelManager::map(4095, neutral, calibration, channels, false));
+        assert(channels[0] == 1000 && channels[1] == 1500);
+    }
+
+    const ChannelManager::Calibration defaults{};
+    assert(!ChannelManager::map(0, 0, defaults, channels, true));
+    assert(channels[0] == 1000 && channels[1] == 1500 && channels[4] == 1000);
+    assertReservedCentered(channels);
+}
+
 void testMappingReversedAndInvalidCalibration() {
     const ChannelManager::Calibration reversed{1100, 100, 1200, 700, 200, true};
     uint16_t channels[12]{};
@@ -153,6 +173,7 @@ int main() {
     testPressBoundaryAndTimerWrap();
     testHeldAtBootRequiresRelease();
     testMappingIncreasingAndClamps();
+    testConfiguredCalibrationMapping();
     testMappingReversedAndInvalidCalibration();
     return 0;
 }

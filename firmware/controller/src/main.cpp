@@ -31,6 +31,12 @@ void setup() {
     pinMode(Pins::LEFT_JOYSTICK_Y, INPUT);
     pinMode(Pins::RIGHT_JOYSTICK_X, INPUT);
     pinMode(Pins::RIGHT_JOYSTICK_Y, INPUT);
+    // Match the ADC settings used to measure the joystick calibration.
+    analogReadResolution(12);
+    analogSetPinAttenuation(Pins::LEFT_JOYSTICK_X, ADC_11db);
+    analogSetPinAttenuation(Pins::LEFT_JOYSTICK_Y, ADC_11db);
+    analogSetPinAttenuation(Pins::RIGHT_JOYSTICK_X, ADC_11db);
+    analogSetPinAttenuation(Pins::RIGHT_JOYSTICK_Y, ADC_11db);
     if (!ChannelManager::isCalibrationValid(calibration)) {
         Serial.println("Input calibration missing or invalid; ARM disabled");
     }
