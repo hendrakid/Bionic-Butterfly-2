@@ -1,14 +1,15 @@
 #include "ControllerLink.h"
-#include "config.h"
+#include "../../include/config.h"
 
 #include <Arduino.h>
 #include <RadioProtocol.h>
 #include <string.h>
 
 namespace {
-constexpr uint32_t ACK_TIMEOUT_MS = 80;
-constexpr uint32_t CONNECTION_STALE_MS = 500;
+constexpr uint32_t ACK_TIMEOUT_MS = ControllerConfig::ACK_TIMEOUT_MS;
+constexpr uint32_t CONNECTION_STALE_MS = ControllerConfig::CONNECTION_STALE_MS;
 constexpr uint32_t STATS_INTERVAL_MS = 1000;
+constexpr uint32_t DISARM_RETRY_MS = ControllerConfig::DISARM_RETRY_MS;
 
 bool macEquals(const uint8_t* left, const uint8_t* right) {
     return memcmp(left, right, RadioTransport::MAC_ADDRESS_SIZE) == 0;
@@ -16,7 +17,39 @@ bool macEquals(const uint8_t* left, const uint8_t* right) {
 }
 
 ControllerLink::ControllerLink(RadioTransport::IRadioTransport& transport)
-    : transport_(transport) {}
+    : transport_(transport) {
+    for (uint16_t& channel : channels_) {
+        channel = RadioProtocol::CHANNEL_CENTER;
+    }
+    channels_[0] = channels_[4] = RadioProtocol::CHANNEL_MIN;
+}
+
+bool ControllerLink::setChannels(
+    const uint16_t (&channels)[RadioProtocol::CHANNEL_COUNT]) {
+    for (uint8_t index = 0; index < RadioProtocol::CHANNEL_COUNT; ++index) {
+        if (channels[index] < RadioProtocol::CHANNEL_MIN ||
+            channels[index] > RadioProtocol::CHANNEL_MAX) {
+            return false;
+        }
+    }
+    const bool changingToDisarm = channels_[4] == RadioProtocol::CHANNEL_MAX &&
+                                   channels[4] != RadioProtocol::CHANNEL_MAX;
+    memcpy(channels_, channels, sizeof(channels_));
+    if (changingToDisarm) {
+        requestDisarm(millis());
+    }
+    return true;
+}
+
+void ControllerLink::requestDisarm(uint32_t nowMs) {
+    channels_[4] = RadioProtocol::CHANNEL_MIN;
+    immediateDisarmPending_ = true;
+    disarmConfirmed_ = false;
+    nextDisarmRetryAtMs_ = nowMs;
+    for (Pending& pending : pending_) {
+        pending.active = false;
+    }
+}
 
 bool ControllerLink::begin(uint32_t nowMs) {
     RadioTransport::TransportConfig config{};
@@ -38,11 +71,23 @@ void ControllerLink::update(uint32_t nowMs) {
         return;
     }
 
-    processAcknowledgments(nowMs);
     expirePending(nowMs);
+    processAcknowledgments(nowMs);
 
+    bool submittedDisarm = false;
+    if (immediateDisarmPending_ &&
+        static_cast<int32_t>(nowMs - nextDisarmRetryAtMs_) >= 0) {
+        submittedDisarm = sendControl(nowMs);
+        if (submittedDisarm) {
+            immediateDisarmPending_ = false;
+        } else {
+            nextDisarmRetryAtMs_ = nowMs + DISARM_RETRY_MS;
+        }
+    }
     if (static_cast<int32_t>(nowMs - nextControlAtMs_) >= 0) {
-        sendControl(nowMs);
+        if (!submittedDisarm && !immediateDisarmPending_) {
+            sendControl(nowMs);
+        }
         nextControlAtMs_ += ControllerConfig::CONTROL_INTERVAL_MS;
         if (static_cast<int32_t>(nowMs - nextControlAtMs_) >= 0) {
             const uint32_t skipped =
@@ -75,16 +120,30 @@ void ControllerLink::processAcknowledgments(uint32_t nowMs) {
         if (pendingIndex < 0 ||
             !RadioProtocol::deserializeAcknowledgmentPacket(
                 frame.payload, static_cast<uint8_t>(frame.length), acknowledgment, sequence) ||
-            acknowledgment.receiverStatus != static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Disarmed) ||
             static_cast<uint32_t>(nowMs - pending_[pendingIndex].submittedAtMs) >= ACK_TIMEOUT_MS) {
             ++metrics_.acknowledgmentsRejected;
             continue;
         }
 
         Pending& pending = pending_[pendingIndex];
+        const bool disarmCommand = pending.disarmCommand;
         pending.active = false;
         ++metrics_.acknowledgmentsConfirmed;
-        metrics_.lastAcknowledgedSequence = acknowledgment.acknowledgedSequence;
+        const bool newestStatus = !hasAcknowledgment_ ||
+            RadioProtocol::isSequenceNewer(sequence, metrics_.lastAcknowledgedSequence);
+        if (newestStatus) {
+            metrics_.lastAcknowledgedSequence = sequence;
+            metrics_.receiverStatus = static_cast<RadioProtocol::ReceiverStatus>(
+                acknowledgment.receiverStatus);
+            if (disarmCommand &&
+                metrics_.receiverStatus == RadioProtocol::ReceiverStatus::Disarmed) {
+                disarmConfirmed_ = true;
+            }
+            if (!disarmCommand &&
+                metrics_.receiverStatus != RadioProtocol::ReceiverStatus::Armed) {
+                requestDisarm(nowMs);
+            }
+        }
         metrics_.lastAcknowledgmentRttMs = static_cast<uint32_t>(nowMs - pending.submittedAtMs);
         lastAcknowledgmentAtMs_ = nowMs;
         hasAcknowledgment_ = true;
@@ -115,10 +174,11 @@ void ControllerLink::expirePending(uint32_t nowMs) {
         static_cast<uint32_t>(nowMs - lastAcknowledgmentAtMs_) >= CONNECTION_STALE_MS) {
         metrics_.connectionConfirmed = false;
         disconnectedSinceMs_ = nowMs;
+        requestDisarm(nowMs);
     }
 }
 
-void ControllerLink::sendControl(uint32_t nowMs) {
+bool ControllerLink::sendControl(uint32_t nowMs) {
     const uint16_t sequence = sequence_++;
     int freeIndex = -1;
     for (uint8_t i = 0; i < ControllerConfig::PENDING_CAPACITY; ++i) {
@@ -142,22 +202,20 @@ void ControllerLink::sendControl(uint32_t nowMs) {
     packet.protocolVersion = RadioProtocol::PROTOCOL_VERSION;
     packet.packetType = RadioProtocol::PacketType::Control;
     packet.sequence = sequence;
-    for (uint8_t index = 0; index < RadioProtocol::CHANNEL_COUNT; ++index) {
-        packet.channels[index] = RadioProtocol::CHANNEL_CENTER;
-    }
-    packet.channels[0] = RadioProtocol::CHANNEL_MIN;
-    packet.channels[4] = RadioProtocol::CHANNEL_MIN;
+    memcpy(packet.channels, channels_, sizeof(packet.channels));
 
     uint8_t wire[RadioProtocol::CONTROL_PACKET_WIRE_SIZE]{};
     if (!RadioProtocol::serializeControlPacket(packet, wire, sizeof(wire)) ||
         transport_.send(wire, sizeof(wire)) != RadioTransport::SendResult::Accepted) {
         ++metrics_.sendFailures;
-        return;
+        return false;
     }
 
-    pending_[freeIndex] = {true, sequence, nowMs};
+    pending_[freeIndex] = {true, sequence, nowMs,
+                           packet.channels[4] != RadioProtocol::CHANNEL_MAX};
     ++metrics_.controlSubmitted;
     metrics_.lastControlSequence = sequence;
+    return true;
 }
 
 int ControllerLink::findPending(uint16_t sequence) const {

@@ -2,7 +2,7 @@
 # Bionic Butterfly - Project Specification
 
 Version: 1.0.0
-Status: Initial Engineering Baseline
+Status: Firmware MVP implemented; hardware commissioning pending
 
 ## 1. Overview
 
@@ -84,7 +84,7 @@ Intermediate CH5 values are conservatively interpreted as DISARM by the receiver
 - Flapping calculations use receiver-local time and run outside radio callbacks.
 - Lower/upper amplitudes are angles relative to effective servo center; differential amplitude changes excursion, not center. Left upper/lower = upper+differential / lower-differential; right upper/lower = upper-differential / lower+differential. Servo phases are opposite.
 
-Servo mechanical limits must be configurable. Per-servo angle-to-pulse calibration and trim are required. Configuration loads from persistent storage when available in the final design, otherwise defaults are used. The temporary compile-time override mechanism is optional and build-time only: valid overrides replace defaults, absent/invalid overrides fall back, and changes require rebuild/reflash. `save()` and `reset()` are currently unsupported; replace/remove this temporary mechanism when final configuration storage is implemented. DISARM/failsafe safe positions are configured independently of servo center.
+Servo mechanical limits must be configurable. Per-servo angle-to-pulse calibration and trim are required. The temporary compile-time override mechanism is optional and build-time only: valid overrides replace defaults; absent/invalid overrides fall back to an intentionally uncommissioned configuration that never attaches PWM, and changes require rebuild/reflash. The gate requires measured limits, pulse endpoints/center, independent safe positions, direction, trim, slew rate, and update interval. Persistent `save()` and `reset()` are not implemented; replace/remove this temporary mechanism when final configuration storage is implemented. DISARM/failsafe safe positions are configured independently of servo center.
 
 ## 8. Safety
 
@@ -93,7 +93,9 @@ Servo mechanical limits must be configurable. Per-servo angle-to-pulse calibrati
 - Invalid packets are rejected.
 - Link timeout triggers failsafe.
 - Reconnection does not automatically ARM.
-- DISARM takes priority.
+- DISARM takes priority across a complete bounded receive drain before output writes.
+- After boot or timeout, a valid DISARM followed by a fresh ARM is required; ARM-only recovery cannot enable motion.
+- Servo output remains disabled until measured configuration and explicit commissioning pass.
 
 ## 9. Development Principles
 

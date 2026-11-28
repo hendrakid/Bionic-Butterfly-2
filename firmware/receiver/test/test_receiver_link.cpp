@@ -104,7 +104,7 @@ void testValidationAndDisarmedAck() {
     transport.enqueue(makeControl(11, 520, RadioProtocol::CHANNEL_MAX));
     updateLink(link, 520);
     assert(link.metrics().acceptedControls == 2);
-    assert(link.metrics().armRequestsIgnored == 1);
+    assert(link.metrics().armRequestsRejected == 1);
     assert(transport.sentPackets.size() == 2);
     assert(RadioProtocol::deserializeAcknowledgmentPacket(
         transport.sentPackets.back().data(),
@@ -153,6 +153,65 @@ void testTimeoutAcrossMillisRollover() {
     assert(link.metrics().timeoutTransitions == 1);
 }
 
+void testRearmPriorityAndGapCannotBeMasked() {
+    FakeRadioTransport transport;
+    ReceiverLink link(transport);
+    link.setOutputReady(true);
+    assert(link.begin(0));
+    transport.enqueue(makeControl(65534, 0, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 0);
+    assert(!link.armed());
+    transport.enqueue(makeControl(65535, 10));
+    updateLink(link, 10);
+    transport.enqueue(makeControl(0, 20, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 20);
+    assert(link.armed());
+    transport.enqueue(makeControl(1, 30, RadioProtocol::CHANNEL_MAX));
+    transport.enqueue(makeControl(2, 30));
+    updateLink(link, 30);
+    assert(!link.armed());
+    assert(transport.sentPackets[3][4] !=
+           static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Armed));
+    transport.enqueue(makeControl(3, 40, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 40);
+    assert(link.armed());
+
+    transport.enqueue(makeControl(0, 540, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 540);
+    assert(link.metrics().timeoutTransitions == 1);
+    assert(!link.armed());
+    assert(link.status() == RadioProtocol::ReceiverStatus::Failsafe);
+    transport.enqueue(makeControl(1, 541, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 541);
+    assert(!link.armed());
+    transport.enqueue(makeControl(2, 542));
+    transport.enqueue(makeControl(3, 542, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 542);
+    assert(!link.armed());
+    transport.enqueue(makeControl(4, 543, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 543);
+    assert(link.armed());
+    link.setOutputFault(true);
+    assert(!link.armed());
+}
+
+void testOldRecoveryAndFutureFramesDoNotEnableArm() {
+    FakeRadioTransport transport;
+    ReceiverLink link(transport);
+    link.setOutputReady(true);
+    assert(link.begin(0));
+    transport.enqueue(makeControl(0, 0));
+    updateLink(link, 0);
+    transport.enqueue(makeControl(1, 499));
+    transport.enqueue(makeControl(2, 501, RadioProtocol::CHANNEL_MAX));
+    updateLink(link, 500);
+    assert(link.metrics().timeoutTransitions == 1);
+    assert(link.metrics().expiredFrames == 2);
+    assert(link.metrics().futureFrames == 1);
+    assert(!link.armed());
+    assert(link.metrics().timedOut);
+}
+
 void testAckSendFailureIsCounted() {
     FakeRadioTransport transport;
     ReceiverLink link(transport);
@@ -172,6 +231,8 @@ int main() {
     testValidationAndDisarmedAck();
     testDuplicateStaleTimeoutAndRecovery();
     testTimeoutAcrossMillisRollover();
+    testRearmPriorityAndGapCannotBeMasked();
+    testOldRecoveryAndFutureFramesDoNotEnableArm();
     testAckSendFailureIsCounted();
     std::puts("ReceiverLink unit tests passed");
     return 0;

@@ -113,10 +113,58 @@ void testControlIsReceivedAckedAndConfirmed() {
     assert(controller.metrics().connectionConfirmed);
 }
 
+void testFreshDisarmThenArmAndTimeoutRecovery() {
+    LoopbackBus bus;
+    LoopbackTransport controllerTransport(bus, CONTROLLER_MAC, bus.controllerInbox, bus.receiverInbox);
+    LoopbackTransport receiverTransport(bus, RECEIVER_MAC, bus.receiverInbox, bus.controllerInbox);
+    ControllerLink controller(controllerTransport);
+    ReceiverLink receiver(receiverTransport);
+    receiver.setOutputReady(true);
+    assert(controller.begin(0));
+    assert(receiver.begin(0));
+    controller.update(0);
+    bus.nowMs = testMillis = 1;
+    receiver.update(bus.nowMs);
+    bus.nowMs = testMillis = 2;
+    controller.update(bus.nowMs);
+    assert(controller.disarmConfirmed());
+
+    uint16_t channels[RadioProtocol::CHANNEL_COUNT];
+    for (uint16_t& channel : channels) { channel = RadioProtocol::CHANNEL_CENTER; }
+    channels[0] = RadioProtocol::CHANNEL_MIN;
+    channels[4] = RadioProtocol::CHANNEL_MAX;
+    assert(controller.setChannels(channels));
+    bus.nowMs = testMillis = 100;
+    controller.update(bus.nowMs);
+    bus.nowMs = testMillis = 101;
+    receiver.update(bus.nowMs);
+    assert(receiver.armed());
+    bus.nowMs = testMillis = 102;
+    controller.update(bus.nowMs);
+    assert(controller.metrics().receiverStatus == RadioProtocol::ReceiverStatus::Armed);
+
+    bus.nowMs = testMillis = 601;
+    receiver.update(bus.nowMs);
+    assert(!receiver.armed());
+    assert(receiver.status() == RadioProtocol::ReceiverStatus::Failsafe);
+    bus.nowMs = testMillis = 602;
+    controller.update(bus.nowMs);
+    assert(!controller.metrics().connectionConfirmed);
+    assert(!controller.disarmConfirmed());
+    bus.nowMs = testMillis = 603;
+    receiver.update(bus.nowMs);
+    assert(receiver.status() == RadioProtocol::ReceiverStatus::Disarmed);
+    bus.nowMs = testMillis = 604;
+    controller.update(bus.nowMs);
+    assert(controller.disarmConfirmed());
+    assert(controller.metrics().receiverStatus == RadioProtocol::ReceiverStatus::Disarmed);
+}
+
 } // namespace
 
 int main() {
     testControlIsReceivedAckedAndConfirmed();
+    testFreshDisarmThenArmAndTimeoutRecovery();
     std::puts("Controller-Receiver cycle integration test passed");
     return 0;
 }

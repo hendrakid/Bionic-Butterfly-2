@@ -1,5 +1,5 @@
 #include "ReceiverLink.h"
-#include "config.h"
+#include "../../include/config.h"
 
 #include <Arduino.h>
 #include <RadioProtocol.h>
@@ -14,6 +14,22 @@ bool macEquals(const uint8_t* left, const uint8_t* right) {
 ReceiverLink::ReceiverLink(RadioTransport::IRadioTransport& transport)
     : transport_(transport) {
     metrics_.timedOut = true;
+    for (uint16_t& channel : channels_) {
+        channel = RadioProtocol::CHANNEL_CENTER;
+    }
+    channels_[0] = channels_[4] = RadioProtocol::CHANNEL_MIN;
+}
+
+void ReceiverLink::setOutputReady(bool ready) {
+    outputReady_ = ready;
+    if (!ready && safety_.armed()) {
+        setOutputFault(true);
+    }
+}
+
+void ReceiverLink::setOutputFault(bool active) {
+    safety_.setFault(active);
+    metrics_.receiverStatus = safety_.status();
 }
 
 bool ReceiverLink::begin(uint32_t nowMs) {
@@ -25,16 +41,18 @@ bool ReceiverLink::begin(uint32_t nowMs) {
     ready_ = transport_.begin(config);
     lastAcceptedAtMs_ = nowMs;
     lastLogMs_ = nowMs;
-    Serial.printf("RX transport=%s sta_mac_expected=9C:CC:01:A9:65:20 peer=D4:E9:F4:E2:90:F0 channel=%u safety=DISARMED servo=disabled\n",
-                  ready_ ? "READY" : "NOT_READY", RadioProtocol::WIFI_CHANNEL);
+    Serial.printf("RX transport=%s sta_mac_expected=9C:CC:01:A9:65:20 peer=D4:E9:F4:E2:90:F0 channel=%u safety=%u output_ready=%u\n",
+                  ready_ ? "READY" : "NOT_READY", RadioProtocol::WIFI_CHANNEL,
+                  static_cast<unsigned>(safety_.status()), outputReady_ ? 1U : 0U);
     return ready_;
 }
 
 void ReceiverLink::update(uint32_t nowMs) {
-    if (!ready_) {
-        return;
+    nowMs = millis();
+    updateTimeout(nowMs);
+    if (ready_) {
+        processControls();
     }
-    processControls();
     nowMs = millis();
     updateTimeout(nowMs);
     if (static_cast<uint32_t>(nowMs - lastLogMs_) >= 1000) {
@@ -50,15 +68,31 @@ bool ReceiverLink::isExpectedMac(const uint8_t* mac) const {
 void ReceiverLink::processControls() {
     RadioTransport::RxFrame frame{};
     uint8_t processed = 0;
+    RadioProtocol::ControlPacket accepted[RadioTransport::RX_DRAIN_BUDGET]{};
+    uint8_t acceptedCount = 0;
+    bool disarmSeenThisDrain = false;
     while (processed++ < RadioTransport::RX_DRAIN_BUDGET && transport_.tryReceive(frame)) {
         const uint32_t nowMs = millis();
+        const uint32_t previousTimeouts = metrics_.timeoutTransitions;
+        updateTimeout(nowMs);
+        if (metrics_.timeoutTransitions != previousTimeouts) {
+            metrics_.acceptedControls -= acceptedCount;
+            metrics_.expiredFrames += acceptedCount;
+            acceptedCount = 0;
+            disarmSeenThisDrain = false;
+        }
         if (!isExpectedMac(frame.sourceMac) ||
             frame.length != RadioProtocol::CONTROL_PACKET_WIRE_SIZE) {
             ++metrics_.rejectedControls;
             continue;
         }
-        if (static_cast<uint32_t>(nowMs - frame.receivedAtMs) >=
-            ReceiverConfig::LINK_TIMEOUT_MS) {
+        const uint32_t queuedAge = static_cast<uint32_t>(nowMs - frame.receivedAtMs);
+        if (queuedAge >= ReceiverConfig::LINK_TIMEOUT_MS ||
+            static_cast<int32_t>(nowMs - frame.receivedAtMs) < 0 ||
+            (metrics_.timedOut && metrics_.timeoutTransitions > 0 &&
+             static_cast<int32_t>(frame.receivedAtMs - lastTimeoutAtMs_) < 0) ||
+            (hasLastSequence_ &&
+             static_cast<int32_t>(frame.receivedAtMs - lastAcceptedAtMs_) < 0)) {
             ++metrics_.expiredFrames;
             if (static_cast<int32_t>(nowMs - frame.receivedAtMs) < 0) {
                 ++metrics_.futureFrames;
@@ -74,30 +108,49 @@ void ReceiverLink::processControls() {
             continue;
         }
 
+        const bool wasTimedOut = metrics_.timedOut;
         hasLastSequence_ = true;
         metrics_.lastSequence = control.sequence;
         ++metrics_.acceptedControls;
         lastAcceptedAtMs_ = frame.receivedAtMs;
-        if (metrics_.timedOut) {
+        metrics_.timedOut = false;
+        if (wasTimedOut) {
             if (metrics_.timeoutTransitions > 0) {
                 metrics_.lastRecoveryMs = static_cast<uint32_t>(nowMs - lastTimeoutAtMs_);
-                Serial.printf("RX link=recovered recovery_ms=%lu seq=%u safe_state=DISARMED\n",
+                Serial.printf("RX link=recovered recovery_ms=%lu seq=%u awaiting_disarm=1\n",
                               static_cast<unsigned long>(metrics_.lastRecoveryMs),
                               control.sequence);
             } else {
-                Serial.printf("RX link=confirmed seq=%u safe_state=DISARMED\n", control.sequence);
+                Serial.printf("RX link=confirmed seq=%u\n", control.sequence);
             }
         }
-        metrics_.timedOut = false;
-        if (control.channels[4] > RadioProtocol::CHANNEL_MIN) {
-            ++metrics_.armRequestsIgnored;
+
+        accepted[acceptedCount++] = control;
+        disarmSeenThisDrain |= control.channels[4] != RadioProtocol::CHANNEL_MAX;
+    }
+
+    if (disarmSeenThisDrain) {
+        safety_.processControl(RadioProtocol::CHANNEL_MIN, false);
+    }
+    for (uint8_t index = 0; index < acceptedCount; ++index) {
+        const RadioProtocol::ControlPacket& control = accepted[index];
+        const bool requestsArm = control.channels[4] == RadioProtocol::CHANNEL_MAX;
+        const RadioProtocol::ReceiverStatus status = safety_.processControl(
+            control.channels[4], outputReady_ && !disarmSeenThisDrain);
+        if (requestsArm && status != RadioProtocol::ReceiverStatus::Armed) {
+            ++metrics_.armRequestsRejected;
         }
+        metrics_.receiverStatus = status;
+        for (uint8_t index = 0; index < RadioProtocol::CHANNEL_COUNT; ++index) {
+            channels_[index] = control.channels[index];
+        }
+        hasControl_ = true;
 
         RadioProtocol::AcknowledgmentPacket acknowledgment{};
         acknowledgment.protocolVersion = RadioProtocol::PROTOCOL_VERSION;
         acknowledgment.packetType = RadioProtocol::PacketType::Acknowledgment;
         acknowledgment.acknowledgedSequence = control.sequence;
-        acknowledgment.receiverStatus = static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Disarmed);
+        acknowledgment.receiverStatus = static_cast<uint8_t>(status);
         uint8_t wire[RadioProtocol::ACKNOWLEDGMENT_PACKET_WIRE_SIZE]{};
         if (RadioProtocol::serializeAcknowledgmentPacket(
                 acknowledgment, wire, sizeof(wire)) &&
@@ -106,7 +159,6 @@ void ReceiverLink::processControls() {
         } else {
             ++metrics_.acknowledgmentSendFailures;
         }
-
     }
 }
 
@@ -115,9 +167,12 @@ void ReceiverLink::updateTimeout(uint32_t nowMs) {
         static_cast<uint32_t>(nowMs - lastAcceptedAtMs_) >= ReceiverConfig::LINK_TIMEOUT_MS) {
         metrics_.timedOut = true;
         hasLastSequence_ = false;
+        hasControl_ = false;
+        safety_.onLinkTimeout();
+        metrics_.receiverStatus = safety_.status();
         ++metrics_.timeoutTransitions;
         lastTimeoutAtMs_ = nowMs;
-        Serial.printf("RX link=TIMEOUT safe_state=DISARMED servo=disabled age_ms=%lu\n",
+        Serial.printf("RX link=TIMEOUT safe_state=FAILSAFE age_ms=%lu\n",
                       static_cast<unsigned long>(nowMs - lastAcceptedAtMs_));
     }
 }

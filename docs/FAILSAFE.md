@@ -24,7 +24,9 @@ DISARMED
 ## Reconnection
 
 - Reconnection does not automatically ARM.
-- Explicit ARM command is required again.
+- After boot or timeout, receive a valid DISARM before a fresh ARM on a healthy link.
+- The controller cancels its old ARM request on link loss or fresh non-ARMED receiver ACK. It requires a new short press after a DISARM ACK, and measured valid input calibration.
+- Output initialization/configuration/driver faults inhibit ARM. A driver write failure detaches both PWM outputs: this is reported as a fault, not a claim that the physical servo reached its safe position.
 
 ## Initial Timeout
 
@@ -37,7 +39,8 @@ DISARMED
 - Queued frames at least 500 ms old remain expired, including across millisecond counter rollover. The timeout threshold is unchanged.
 - On a link timeout, reset sequence tracking so a restarted controller can resume from sequence zero. Recovery remains DISARMED; it never automatically ARM.
 - When elapsed time reaches 500 ms without a new valid control packet, enter failsafe.
-- The initial receiver implementation remains DISARMED and does not drive servos; accepted controls only produce a DISARMED application ACK.
+- The receiver starts DISARMED. With no valid measured servo configuration it does not attach PWM; valid controls receive ACK carrying the actual DISARMED/FAILSAFE status. A configured output fault reports FAILSAFE.
+- The receiver checks elapsed time before draining controls, between dequeued frames, after draining, and immediately before servo output. An ARM-only recovery packet cannot clear FAILSAFE; a validated DISARM followed by a fresh ARM in a later drain is required. A DISARM anywhere in one drain suppresses ARM throughout that drain.
 
 ## Servo Safety
 
@@ -55,7 +58,7 @@ CH5=1000 requests DISARM; CH5=2000 requests ARM; intermediate values are treated
 
 CH1 maps linearly from 1000-2000 to 0-5 Hz. CH2 maps 1000/1500/2000 to maximum left differential / zero / maximum right differential, applying configured steering gain and trim then limiting to configured differential bounds. Other channels are ignored. Both servos alternate in opposite phase, with differential applied to swing amplitudes rather than center. Sinusoidal waveform is the default; triangular is an optional configuration. At 0 Hz while armed, hold each effective center.
 
-Effective center pulse is nominal center pulse plus the pulse-equivalent of per-servo trim degrees, normalized using that servo's calibrated angle-to-pulse mapping. Clamp angles and pulses to configured and mechanically validated limits. Initial configuration values are maximum frequency 5 Hz, amplitude -90 to +90 degrees, differential ±15 degrees, pulse limits 500-2500 µs, nominal center at their midpoint, zero servo trims, 100% steering gain, zero steering trim, and sinusoidal waveform. These are configuration defaults, not proof of safe mechanical travel; calibrate each servo/mechanism and validate before installing linkage.
+Effective center pulse is the measured center pulse plus the pulse-equivalent of per-servo trim degrees using that servo's calibrated angle-to-pulse mapping. Clamp angles and pulses to configured and mechanically validated limits. No mechanical endpoint, amplitude, pulse, safe-angle, or slew default is considered measured. The compile-time fallback disables commissioning and PWM entirely. Before enabling the output, supply a measured `servo_overrides.h` with `ReceiverOverrides::MOTION` and `ReceiverOverrides::SERVOS` typed as `Butterfly::MotionConfig` and `Butterfly::ServoConfig`; both configurations must validate, `measurementsConfirmed` and `commissioningEnabled` must be true. An absent/invalid override falls back to disabled defaults. Do not set those flags merely to obtain an ARM ACK. The configured safe-angle pulse is written at first attach; actual shaft position is unknown without feedback. DISARM/failsafe commands slew from the last commanded position to safe and hold it; a PWM/driver fault may prevent physical movement.
 
 ## Testing
 

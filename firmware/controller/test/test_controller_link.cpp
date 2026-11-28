@@ -73,9 +73,9 @@ void testOnlyMatchingDisarmedApplicationAckConfirmsDelivery() {
     transport.enqueue(wrongPeer);
     RadioTransport::RxFrame wrongSequence = makeAck(1, RECEIVER_MAC);
     transport.enqueue(wrongSequence);
-    RadioTransport::RxFrame armed = makeAck(
-        0, RECEIVER_MAC, static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Armed));
-    transport.enqueue(armed);
+    RadioTransport::RxFrame undefinedStatus = makeAck(0, RECEIVER_MAC);
+    undefinedStatus.payload[4] = 255;
+    transport.enqueue(undefinedStatus);
     RadioTransport::RxFrame wrongVersion = makeAck(0, RECEIVER_MAC);
     wrongVersion.payload[0] = static_cast<uint8_t>(RadioProtocol::PROTOCOL_VERSION - 1);
     transport.enqueue(wrongVersion);
@@ -136,6 +136,53 @@ void testAckDeadlineSendFailureAndRecovery() {
     assert(link.metrics().lastRecoveryMs == 5);
 }
 
+void testAllAckStatusesAndImmediatePersistentDisarm() {
+    FakeRadioTransport transport;
+    ControllerLink link(transport);
+    assert(link.begin(0));
+    link.update(0);
+    transport.enqueue(makeAck(0, RECEIVER_MAC));
+    link.update(1);
+    assert(link.disarmConfirmed());
+
+    uint16_t channels[RadioProtocol::CHANNEL_COUNT];
+    for (uint16_t& value : channels) { value = RadioProtocol::CHANNEL_CENTER; }
+    channels[4] = RadioProtocol::CHANNEL_MAX;
+    assert(link.setChannels(channels));
+    link.update(100);
+    transport.enqueue(makeAck(1, RECEIVER_MAC,
+        static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Armed)));
+    link.update(105);
+    assert(link.metrics().connectionConfirmed);
+    assert(link.metrics().receiverStatus == RadioProtocol::ReceiverStatus::Armed);
+
+    link.requestDisarm(120);
+    transport.nextSendResult = RadioTransport::SendResult::Busy;
+    link.update(120);
+    const uint32_t attempted = transport.sendCalls;
+    link.update(124);
+    assert(transport.sendCalls == attempted);
+    transport.nextSendResult = RadioTransport::SendResult::Error;
+    link.update(125);
+    assert(transport.sendCalls == attempted + 1);
+    transport.nextSendResult = RadioTransport::SendResult::Accepted;
+    link.update(130);
+    assert(transport.sendCalls == attempted + 2);
+    assert(RadioProtocol::readUint16LittleEndian(transport.lastSentPacket.data() + 12) ==
+           RadioProtocol::CHANNEL_MIN);
+    const uint16_t disarmSequence = link.metrics().lastControlSequence;
+    transport.enqueue(makeAck(disarmSequence, RECEIVER_MAC,
+        static_cast<uint8_t>(RadioProtocol::ReceiverStatus::Failsafe)));
+    link.update(135);
+    assert(link.metrics().receiverStatus == RadioProtocol::ReceiverStatus::Failsafe);
+    assert(!link.disarmConfirmed());
+    link.update(200);
+    transport.enqueue(makeAck(link.metrics().lastControlSequence, RECEIVER_MAC));
+    link.update(205);
+    assert(link.disarmConfirmed());
+    assert(link.metrics().receiverStatus == RadioProtocol::ReceiverStatus::Disarmed);
+}
+
 void testSequenceRollover() {
     FakeRadioTransport transport;
     transport.recordSentPackets = false;
@@ -155,6 +202,7 @@ int main() {
     testSchedulingPacketAndTransportConfig();
     testOnlyMatchingDisarmedApplicationAckConfirmsDelivery();
     testAckDeadlineSendFailureAndRecovery();
+    testAllAckStatusesAndImmediatePersistentDisarm();
     testSequenceRollover();
     std::puts("ControllerLink unit tests passed");
     return 0;
